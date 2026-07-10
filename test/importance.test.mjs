@@ -113,3 +113,16 @@ test('ordinary movie has no importance signal', () => {
   const r = assessImportance({ title: 'Un film oarecare', description: 'drama, doi oameni' });
   assert.equal(r.tier, 0);
 });
+
+test('cooking show with "marea finala" in description is NOT an event (TLC case)', () => {
+  const r = assessImportance({
+    title: 'Ingrediente misterioase, rețete delicioase Sezonul 61 - Episodul 7',
+    description: '- Marea finală\nÎntr-o finală cu miză mare, chefii primesc sume mari de bani...',
+  });
+  assert.equal(r.tier, 0);
+});
+
+test('country pair combined with named competition in description still boosts', () => {
+  const r = assessImportance({ title: 'Spania - Belgia', description: 'optimile Cupei Mondiale FIFA' });
+  assert.ok(r.score >= 0.75);
+});

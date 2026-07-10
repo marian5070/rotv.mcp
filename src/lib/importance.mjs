@@ -10,6 +10,10 @@ import { programDurationMin } from './time.mjs';
 const MAJOR_RE =
   /\b(world cup|cupa mondiala|campionat(ul)? mondial|fifa|euro 20\d\d|campionat(ul)? european|uefa euro|liga campionilor|champions league|europa league|jocuri(le)? olimpice|olympic|finala|grand slam|roland garros|wimbledon|us open|australian open)\b/;
 
+// Description-only variant: named competitions only — no bare stage words.
+const MAJOR_DESC_RE =
+  /\b(world cup|cupa mondiala|campionat(ul)? mondial|fifa|euro 20\d\d|campionat(ul)? european|uefa euro|liga campionilor|champions league|europa league|jocuri(le)? olimpice|olympic|grand slam|roland garros|wimbledon|us open|australian open)\b/;
+
 // Knockout / decisive stages.
 const KNOCKOUT_RE = /\b(optimi(le)?|sferturi(le)?|semifinala?|semifinale(le)?|finala mica|marea finala|baraj)\b/;
 
@@ -56,19 +60,22 @@ export function assessImportance(program, channel = {}) {
   const reasons = [];
 
   const majorInTitle = titleN.match(MAJOR_RE);
-  const majorAnywhere = allN.match(MAJOR_RE);
+  // In descriptions, generic words like "finala" are false-positive magnets
+  // (cooking shows have "marea finala" too) — the description-only path
+  // requires a NAMED competition, not just a stage word.
+  const majorInDesc = allN.match(MAJOR_DESC_RE);
   if (majorInTitle) {
     score = 0.9;
     reasons.push(`major competition in title: "${majorInTitle[0]}"`);
-  } else if (majorAnywhere) {
+  } else if (majorInDesc) {
     score = 0.55;
-    reasons.push(`major competition mentioned in description: "${majorAnywhere[0]}"`);
+    reasons.push(`major competition mentioned in description: "${majorInDesc[0]}"`);
   }
 
   const pair = allN.match(COUNTRY_PAIR_RE);
   if (pair) {
     score = Math.max(score, 0.65);
-    if (majorAnywhere) score = cap(score + 0.1);
+    if (majorInTitle || majorInDesc) score = cap(score + 0.1);
     reasons.push(`national teams match: "${pair[0]}"`);
   }
 
