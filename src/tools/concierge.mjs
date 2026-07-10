@@ -12,8 +12,10 @@ import { detectNoise, NOISE_CATEGORY_KEYS } from '../lib/anti-noise.mjs';
 import { dedupCandidates } from '../lib/dedup.mjs';
 import {
   ratingSignal, moodFitAxis, timeFitAxis, availabilityAxis, opportunityAxis,
-  computeComposite, computeConfidence, confidenceBreakdown,
+  importanceAxis, computeComposite, computeConfidence, confidenceBreakdown,
 } from '../lib/confidence.mjs';
+import { assessImportance } from '../lib/importance.mjs';
+import { handleImportantToday } from './important-today.mjs';
 import { buildTimeline, buildDegradedTimeline } from '../lib/timeline.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
 
@@ -41,6 +43,7 @@ export const ConciergeOutput = {
   }).passthrough(),
   alternatives: z.array(Loose),
   lookahead: Loose,
+  important_today: z.array(Loose).optional(),
   sources_used: z.array(z.string()),
   freshness: Freshness,
 };
@@ -182,11 +185,27 @@ function applyKeywordFilter(candidates, excludeKw) {
 }
 
 function computePartialAxes(c, winDurationMin, winStartUtc) {
+  // Event importance is only assessable for TV (EPG text); streaming titles
+  // are on-demand, so "watch it tonight" urgency does not apply.
+  if (c._importance === undefined) {
+    c._importance = c.source === 'tv'
+      ? assessImportance(
+          {
+            title: c.shaped.program.title,
+            description: c.shaped.program.description,
+            start: c.shaped.program.start_utc,
+            stop: c.shaped.program.stop_utc,
+          },
+          { category: c.shaped.channel_category }
+        )
+      : { score: 0, tier: 0, reasons: [] };
+  }
   return {
     rating_signal: ratingSignal(c),
     mood_fit: moodFitAxis(c._moodFit?.score ?? 0),
     time_fit: timeFitAxis(c, winDurationMin),
     availability: availabilityAxis(c, winStartUtc),
+    event_importance: importanceAxis(c),
   };
 }
 
@@ -418,6 +437,24 @@ function outputContext(args, mood, sources) {
   };
 }
 
+// Major events (tier 1) airing TODAY — surfaced in every concierge answer so
+// a World Cup match is mentioned even when the mood ranking picks a movie.
+async function importantTodayHighlights() {
+  try {
+    const r = await handleImportantToday({ min_tier: 1, limit: 3 });
+    return r.events.map((e) => ({
+      title: e.program.title,
+      channel: e.channel_name,
+      start_local: e.program.start_local,
+      duration_min: e.program.duration_min,
+      tier: e.tier,
+      reasons: e.reasons,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function handleConcierge(args) {
   const epg = getEpgFull();
   if (!epg) throw new Error('EPG data not loaded');
@@ -472,6 +509,7 @@ export async function handleConcierge(args) {
   candsAfterDedup.sort((a, b) => (b._confidence?.pct ?? 0) - (a._confidence?.pct ?? 0));
 
   const fresh = freshnessEmbed(now);
+  const importantToday = sources.includes('tv') ? await importantTodayHighlights() : [];
   const sourcesUsed = [
     ...(sources.includes('tv') ? ['epg-normalized'] : []),
     ...(sources.includes('streaming') ? ['streaming-full'] : []),
@@ -506,6 +544,7 @@ export async function handleConcierge(args) {
         },
         alternatives: [],
         lookahead: { found: false, skipped_reason: 'no_candidates' },
+        important_today: importantToday,
         sources_used: sourcesUsed,
         freshness: fresh,
       },
@@ -562,6 +601,9 @@ export async function handleConcierge(args) {
 
   const breakdown = confidenceBreakdown(primary._axes);
   const reasoning = buildReasoning(primary, primary._axes, exclCats, noiseRes.filtered, lookahead);
+  for (const ev of importantToday) {
+    reasoning.push(`Eveniment major azi: ${ev.title} — ${ev.channel}, ${ev.start_local}`);
+  }
 
   const tvCount = candsAfterDedup.filter((c) => c.source === 'tv').length;
   const streamingCount = candsAfterDedup.filter((c) => c.source === 'streaming').length;
@@ -598,6 +640,7 @@ export async function handleConcierge(args) {
       },
       alternatives,
       lookahead,
+      important_today: importantToday,
       sources_used: sourcesUsed,
       freshness: fresh,
     },
@@ -625,7 +668,7 @@ export const conciergeTool = {
   config: {
     title: 'Personal Entertainment Concierge — decide for me',
     description:
-      'You have a window of free time — decide for me what to watch right now. Returns ONE primary decision (TV program OR streaming title) with confidence percentage, full reasoning breakdown, and up to 3 diverse alternatives with explicit trade-offs (pros/cons, reason not picked). Picks across live Romanian TV EPG AND streaming catalog (Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime). Built-in anti-noise filter automatically removes news, political talk, reality shows, talk-shows (NO manual filtering needed by the model). Built-in title dedup (handles ~46% duplicate-airing ratio in TV EPG). Built-in opportunity-cost lookahead (flags better options just outside the window). PREFER THIS TOOL over tv_recommend_by_mood, tv_plan_evening, and tv_recommend_today whenever the user wants ONE answer / a single decision / a plan for a specific window — those tools return ranked LISTS for browsing, this tool returns a DECISION. Routes any mood internally (obosit / vesel / concentrat / romantic / familie / captivant + EN aliases tired/happy/focused/romantic/family/thrilling). Trigger phrases: "what should I do", "decide for me", "pick for me", "I have X hours", "ce să fac", "am 2 ore", "alege tu", "mood X durată Y", "o singură decizie", "fii consilierul meu", "what to watch", "concierge me".',
+      'You have a window of free time — decide for me what to watch right now. Returns ONE primary decision (TV program OR streaming title) with confidence percentage, full reasoning breakdown, and up to 3 diverse alternatives with explicit trade-offs (pros/cons, reason not picked). Picks across live Romanian TV EPG AND streaming catalog (Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime). Built-in anti-noise filter automatically removes news, political talk, reality shows, talk-shows (NO manual filtering needed by the model). Built-in title dedup (handles ~46% duplicate-airing ratio in TV EPG). Built-in opportunity-cost lookahead (flags better options just outside the window). Event-aware: major broadcasts (World Cup / Euro / Champions League / finals) get an importance boost in ranking AND are always listed in the important_today field, even when the mood-based pick is something else — for questions like "what is important today?", prefer tv_important_today. PREFER THIS TOOL over tv_recommend_by_mood, tv_plan_evening, and tv_recommend_today whenever the user wants ONE answer / a single decision / a plan for a specific window — those tools return ranked LISTS for browsing, this tool returns a DECISION. Routes any mood internally (obosit / vesel / concentrat / romantic / familie / captivant + EN aliases tired/happy/focused/romantic/family/thrilling). Trigger phrases: "what should I do", "decide for me", "pick for me", "I have X hours", "ce să fac", "am 2 ore", "alege tu", "mood X durată Y", "o singură decizie", "fii consilierul meu", "what to watch", "concierge me".',
     inputSchema: ConciergeInput,
     outputSchema: ConciergeOutput,
   },

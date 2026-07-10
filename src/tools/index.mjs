@@ -12,6 +12,7 @@ import { explainTool, handleExplain } from './explain-recommendation.mjs';
 import { checkFreshnessTool, handleCheckFreshness } from './check-freshness.mjs';
 
 import { conciergeTool, handleConcierge } from './concierge.mjs';
+import { importantTodayTool, handleImportantToday } from './important-today.mjs';
 
 import { freshnessEmbed } from '../lib/freshness.mjs';
 
@@ -31,6 +32,8 @@ const TOOL_HANDLERS = {
   tv_check_freshness: handleCheckFreshness,
   // v3
   tv_concierge: handleConcierge,
+  // v3.1
+  tv_important_today: handleImportantToday,
 };
 
 const V2_TOOLS = new Set([
@@ -47,6 +50,7 @@ const TOOL_DEFS = [
   nowOnTvTool, searchProgramTool, primeTimeTool, recommendTool, titleDetailsTool,
   recommendByMoodTool, planEveningTool, compareOptionsTool, findForCoupleTool, explainTool, checkFreshnessTool,
   conciergeTool,
+  importantTodayTool,
 ];
 
 function emitLog(line) {

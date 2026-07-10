@@ -6,11 +6,12 @@ function round2(v) { return Math.round(v * 100) / 100; }
 function round3(v) { return Math.round(v * 1000) / 1000; }
 
 export const CONFIDENCE_WEIGHTS = {
-  rating_signal: 0.20,
-  mood_fit: 0.25,
+  rating_signal: 0.15,
+  mood_fit: 0.20,
   time_fit: 0.20,
   availability: 0.15,
-  opportunity_cost: 0.20,
+  opportunity_cost: 0.15,
+  event_importance: 0.15,
 };
 
 export function ratingSignal(candidate) {
@@ -51,6 +52,18 @@ export function availabilityAxis(candidate, winStartUtc) {
   return { value: clamp(1 - dt / 30, 0, 1), note: `TV start ±${Math.round(dt)} min vs window start` };
 }
 
+// Event-importance axis: fed by assessImportance() (lib/importance.mjs) via
+// candidate._importance. A World Cup match must not lose to a filler movie
+// just because the EPG gives it no rating, no genre and an empty description.
+export function importanceAxis(candidate) {
+  const imp = candidate._importance;
+  if (!imp || !(imp.score > 0)) {
+    return { value: 0, note: 'no event-importance signal' };
+  }
+  const why = imp.reasons?.[0] ? ` — ${imp.reasons[0]}` : '';
+  return { value: imp.score, note: `event importance ${imp.score} (tier ${imp.tier})${why}` };
+}
+
 export function opportunityAxis(candidate, windowMaxComposite) {
   if (!windowMaxComposite || windowMaxComposite <= 0) {
     return { value: 0.5, note: 'no composite peer' };
@@ -66,7 +79,8 @@ export function computeComposite(c, axes) {
   return 0.25 * axes.mood_fit.value
        + 0.20 * axes.time_fit.value
        + 0.20 * axes.rating_signal.value
-       + 0.15 * axes.availability.value;
+       + 0.15 * axes.availability.value
+       + 0.20 * (axes.event_importance?.value ?? 0);
 }
 
 export function computeConfidence(c, axes) {
@@ -75,7 +89,8 @@ export function computeConfidence(c, axes) {
               + w.mood_fit * axes.mood_fit.value
               + w.time_fit * axes.time_fit.value
               + w.availability * axes.availability.value
-              + w.opportunity_cost * axes.opportunity_cost.value;
+              + w.opportunity_cost * axes.opportunity_cost.value
+              + w.event_importance * (axes.event_importance?.value ?? 0);
   const pct = Math.round(total * 100);
   const label = pct >= 75 ? 'high' : pct >= 55 ? 'medium' : 'low';
   return { pct, label, total: round3(total) };
@@ -95,5 +110,6 @@ export function confidenceBreakdown(axes) {
     time_fit: make('time_fit'),
     availability: make('availability'),
     opportunity_cost: make('opportunity_cost'),
+    ...(axes.event_importance ? { event_importance: make('event_importance') } : {}),
   };
 }

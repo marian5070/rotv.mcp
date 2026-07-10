@@ -27,10 +27,10 @@ header "1. initialize"
 INIT=$(jrpc '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}' 2>/dev/null || true)
 if printf '%s' "$INIT" | grep -q '"serverInfo"'; then ok "initialize returns serverInfo"; else ko "initialize failed: $INIT"; fi
 
-header "2. tools/list (expect 12 = 5 v1 + 6 v2 + 1 v3)"
+header "2. tools/list (expect 13 = 5 v1 + 6 v2 + 1 v3 + 1 v3.1)"
 TOOLS=$(jrpc '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' 2>/dev/null || true)
 COUNT=$(printf '%s' "$TOOLS" | grep -oE '"name":"tv_[a-z_]+"' | sort -u | wc -l | tr -d ' ')
-if [ "$COUNT" = "12" ]; then ok "12 tools registered"; else ko "expected 12 tools, got $COUNT"; printf '   %s\n' "$TOOLS" | head -c 500; fi
+if [ "$COUNT" = "13" ]; then ok "13 tools registered"; else ko "expected 13 tools, got $COUNT"; printf '   %s\n' "$TOOLS" | head -c 500; fi
 
 header "3. tv_now_on_tv main, exclude_news"
 R=$(jrpc '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tv_now_on_tv","arguments":{"scope":"main","exclude_news":true,"limit":10}}}' 2>/dev/null || true)
@@ -111,7 +111,7 @@ if printf '%s' "$R" | grep -q '"confidence_pct"'; then ok "tv_concierge 30-min w
 header "21. v3.0.3 outputSchema declared on all 12 tools"
 TOOLS=$(jrpc '{"jsonrpc":"2.0","id":21,"method":"tools/list"}' 2>/dev/null || true)
 SCHEMA_COUNT=$(printf '%s' "$TOOLS" | grep -oE '"outputSchema":\{' | wc -l | tr -d ' ')
-if [ "$SCHEMA_COUNT" = "12" ]; then ok "all 12 tools expose outputSchema"; else ko "expected 12 outputSchema, got $SCHEMA_COUNT"; fi
+if [ "$SCHEMA_COUNT" = "13" ]; then ok "all 13 tools expose outputSchema"; else ko "expected 13 outputSchema, got $SCHEMA_COUNT"; fi
 
 header "22. v3.0.3 /mcp/help serves HTML"
 HELP_STATUS=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/mcp/help" 2>/dev/null || true)
@@ -119,6 +119,14 @@ HELP_CT=$(curl -sSI "$BASE/mcp/help" 2>/dev/null | grep -i '^content-type:' | tr
 if [ "$HELP_STATUS" = "200" ] && echo "$HELP_CT" | grep -qi 'text/html'; then ok "/mcp/help returns HTML 200"; else ko "/mcp/help failed: status=$HELP_STATUS ct=$HELP_CT"; fi
 HELP_BODY=$(curl -fsS "$BASE/mcp/help" 2>/dev/null || true)
 if printf '%s' "$HELP_BODY" | grep -q 'rotv-mcp' && printf '%s' "$HELP_BODY" | grep -q 'tv_concierge'; then ok "/mcp/help mentions rotv-mcp + tv_concierge"; else ko "/mcp/help body missing key terms"; fi
+
+header "23. v3.1 tv_important_today shape"
+R=$(jrpc '{"jsonrpc":"2.0","id":23,"method":"tools/call","params":{"name":"tv_important_today","arguments":{"min_tier":2}}}' 2>/dev/null || true)
+if printf '%s' "$R" | grep -q '"events"'; then ok "tv_important_today returns events shape"; else ko "tv_important_today failed"; printf '   %s\n' "$R" | head -c 500; fi
+
+header "24. v3.1 tv_concierge exposes important_today"
+R=$(jrpc '{"jsonrpc":"2.0","id":24,"method":"tools/call","params":{"name":"tv_concierge","arguments":{"duration_hours":2}}}' 2>/dev/null || true)
+if printf '%s' "$R" | grep -q '"important_today"'; then ok "tv_concierge includes important_today"; else ko "tv_concierge missing important_today"; printf '   %s\n' "$R" | head -c 500; fi
 
 printf "\n\033[1mResults:\033[0m \033[32m%d pass\033[0m / \033[31m%d fail\033[0m\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

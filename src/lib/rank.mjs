@@ -1,3 +1,5 @@
+import { assessImportance } from './importance.mjs';
+
 const CHANNEL_CAT_SCORE = {
   'Filme & Seriale': 3,
   'Documentare': 3,
@@ -26,6 +28,21 @@ export function scoreShaped(item, { prefer = [], excludeNews = true, now = new D
   if (excludeNews && cat === 'Știri') return null;
 
   score += CHANNEL_CAT_SCORE[cat] ?? 0;
+
+  // Major-event boost (World Cup / Euro / CL / finals): a tier-1 event must
+  // outrank the channel-category table (Sport scores only 0.5 vs 3 for
+  // movies, and the World Cup often airs on Generaliste channels anyway).
+  const imp = assessImportance(
+    {
+      title: item.program.title,
+      description: item.program.description,
+      start: item.program.start_utc,
+      stop: item.program.stop_utc,
+    },
+    { category: cat }
+  );
+  if (imp.tier === 1) score += 4;
+  else if (imp.tier === 2) score += 1.5;
 
   if (prefer.length) {
     const preferredCats = prefer.map((p) => PREFERENCE_TO_CATEGORY[p]).filter(Boolean);
