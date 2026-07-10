@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rotv-mcp — Personal Entertainment Concierge pentru ChatGPT</title>
+<meta name="description" content="MCP server care conectează ChatGPT la grila live a 254 canale TV din România și la cataloagele Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime.">
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-2: #7ee787;
+    --warn: #f0883e;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 940px; margin: 0 auto; padding: 28px 22px 80px; }
+  h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: -0.3px; }
+  h1 .sub { color: var(--muted); font-weight: 400; font-size: 16px; display: block; margin-top: 4px; }
+  h2 { font-size: 22px; margin: 44px 0 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  h3 { font-size: 16px; margin: 24px 0 10px; color: var(--accent-2); }
+  p { margin: 8px 0 12px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ul, ol { padding-left: 22px; }
+  ul li, ol li { margin: 4px 0; }
+  code {
+    background: var(--panel-2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: SFMono-Regular, Consolas, Menlo, monospace;
+    color: var(--text);
+  }
+  pre {
+    background: var(--panel-2);
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    font-size: 13px;
+  }
+  pre code { padding: 0; background: transparent; font-size: 13px; }
+  .pills { margin: 12px 0 8px; }
+  .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: var(--panel-2);
+    color: var(--muted);
+    margin-right: 6px;
+    border: 1px solid var(--border);
+  }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tool-name { font-family: SFMono-Regular, Consolas, monospace; color: var(--accent); font-size: 13px; white-space: nowrap; }
+  .badge {
+    display: inline-block;
+    padding: 1px 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .prompt-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 13px 16px;
+    margin: 10px 0;
+  }
+  .prompt-card .label {
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .prompt-card .prompt { font-size: 14px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  @media (min-width: 720px) {
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+  }
+  .status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px;
+    padding: 18px 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 22px 0;
+  }
+  .status .item { display: flex; flex-direction: column; min-width: 90px; }
+  .status .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .status .value { font-family: SFMono-Regular, Consolas, monospace; font-size: 15px; margin-top: 4px; color: var(--accent-2); }
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--panel);
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 14px;
+  }
+  .callout strong { color: var(--accent); }
+  .warn { border-left-color: var(--warn); }
+  .warn strong { color: var(--warn); }
+  kbd {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 12px;
+    font-family: SFMono-Regular, Consolas, monospace;
+  }
+  footer {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  footer a { color: var(--muted); }
+  footer a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>
+    rotv-mcp
+    <span class="sub">Personal Entertainment Concierge pentru ChatGPT — live Romanian TV + streaming.</span>
+  </h1>
+
+  <div class="pills">
+    <span class="pill">Endpoint: https://tv.madeinro.eu/mcp</span>
+    <span class="pill">Protocol: Model Context Protocol</span>
+    <span class="pill">Auth: None (public read-only)</span>
+  </div>
+
+  <div class="status" id="status">
+    <div class="item"><span class="label">Version</span><span class="value" id="s-version">—</span></div>
+    <div class="item"><span class="label">Uptime</span><span class="value" id="s-uptime">—</span></div>
+    <div class="item"><span class="label">EPG cache</span><span class="value" id="s-cache">—</span></div>
+    <div class="item"><span class="label">Tools</span><span class="value">12</span></div>
+  </div>
+
+  <h2>Ce face</h2>
+  <p>
+    <strong>rotv-mcp</strong> conectează ChatGPT (și orice alt client MCP) la grila live a ~254 canale TV din România și la cataloagele de streaming disponibile aici: Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime.
+    12 tool-uri pentru căutare, recomandare, planificare seară și — cel mai important — <strong>decizie unică contextuală</strong>.
+  </p>
+
+  <p>
+    Tool-ul principal <code>tv_concierge</code> răspunde la întrebarea care contează cu adevărat:
+    <em>„Am 2 ore din viață. Care e cea mai bună utilizare a lor din tot ce e disponibil acum?"</em>
+  </p>
+
+  <h3>Cum lucrează concierge-ul</h3>
+  <ul>
+    <li><strong>Multi-source</strong> — combină TV (EPG live) + streaming (catalog România) în același pool de scoring</li>
+    <li><strong>Anti-noise filter</strong> — exclude default politică, reality, talk-show, știri (cu count vizibil în output)</li>
+    <li><strong>Confidence engine pe 5 axe</strong> — rating signal + mood fit + time fit + availability + opportunity cost → procentaj 0–100 cu breakdown</li>
+    <li><strong>Dedup pe titlu</strong> — ~46% din EPG sunt repetări; păstrăm winner-ul, restul devin <code>dup_other_airings</code></li>
+    <li><strong>Opportunity-cost lookahead</strong> — semnalează dacă ceva semnificativ mai bun începe la sfârșitul ferestrei</li>
+    <li><strong>Diverse alternatives</strong> — până la 3 alternative cu pro/contra explicite și motivul pentru care NU au fost prima alegere</li>
+    <li><strong>Timeline cu pauze</strong> — inserare automată de pauze între segmente (≥ 5 min)</li>
+  </ul>
+
+  <h2>Cum o conectezi în ChatGPT</h2>
+  <ol>
+    <li>Deschide ChatGPT și mergi la <kbd>Settings</kbd> → <kbd>Connectors</kbd> (sau <kbd>Apps & Connectors</kbd>, în funcție de versiune)</li>
+    <li>Click pe <kbd>Add custom connector</kbd> (sau <kbd>+ New connector</kbd>)</li>
+    <li>În câmpul <strong>Server URL</strong> introdu: <code>https://tv.madeinro.eu/mcp</code></li>
+    <li>În <strong>Authorization</strong>: lasă pe <strong>None</strong> (server-ul e public read-only)</li>
+    <li>Click <kbd>Connect</kbd>. La aprobare ar trebui să vezi <strong>12 tool-uri</strong> disponibile, inclusiv <code>tv_concierge</code></li>
+  </ol>
+
+  <div class="callout">
+    <strong>Dacă tool-urile par cache-uite</strong> (vezi doar 11 sau lipsește <code>tv_concierge</code>): Disconnect + Reconnect cu aceeași URL. ChatGPT face fresh <code>tools/list</code> la reconectare.
+  </div>
+
+  <h2>Cele 12 tool-uri</h2>
+  <table>
+    <thead><tr><th>Tool</th><th>Ce face</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="tool-name">tv_concierge <span class="badge">v3</span></td>
+        <td>Decide pentru tine — UN titlu (TV sau streaming) cu confidence%, breakdown pe 5 axe, 0-3 alternative diverse. Anti-noise + dedup + lookahead built-in.</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_now_on_tv <span class="badge">v1</span></td>
+        <td>Ce se difuzează chiar acum (14 canale main sau toate 254)</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_search_program <span class="badge">v1</span></td>
+        <td>Căutare free-text peste 254 canale, cu filtre pe categorie + window de timp</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_get_prime_time <span class="badge">v1</span></td>
+        <td>Lineup prime-time 20:00–23:00 grupat pe canale (azi / mâine / dată specifică)</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_recommend_today <span class="badge">v1</span></td>
+        <td>Top-N recomandări pentru un timeframe, scorer determinist (filme + documentare boost)</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_get_title_details <span class="badge">v1</span></td>
+        <td>Caută un titlu peste airings TV viitoare + catalog streaming</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_recommend_by_mood <span class="badge">v2</span></td>
+        <td>Top-N pentru un mood (obosit / vesel / concentrat / romantic / familie / captivant)</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_plan_evening <span class="badge">v2</span></td>
+        <td>Plan greedy multi-segment pentru o seară cu durată dată</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_compare_options <span class="badge">v2</span></td>
+        <td>Compară 2-5 titluri side-by-side cu scor + winner reasoning</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_find_for_couple <span class="badge">v2</span></td>
+        <td>Găsește conținut OK pentru 2 persoane cu mood-uri diferite (fairness strict/average)</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_explain_recommendation <span class="badge">v2</span></td>
+        <td>Breakdown complet pentru o recomandare + lista alternativelor respinse, cu motiv</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_check_freshness <span class="badge">v2</span></td>
+        <td>Status fresh/stale per sursă (EPG normalizat, EPG homepage, streaming catalog)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Exemple de prompt-uri</h2>
+  <p>Iată tipuri de întrebări pe care le poți pune ChatGPT-ului după ce e conectat:</p>
+
+  <h3>Decizie unică (rutează automat la <code>tv_concierge</code>)</h3>
+  <div class="grid">
+    <div class="prompt-card">
+      <div class="label">Decide unic</div>
+      <div class="prompt">Am 2 ore diseară, sunt obosit dar nu vreau să adorm. Decide tu — un singur titlu cu motivare și procentaj de încredere.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Streaming + filtru rating</div>
+      <div class="prompt">90 minute, mood captivant, minim 7.5 pe TMDB, doar streaming, fără alternative — o decizie fermă.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Date night</div>
+      <div class="prompt">Sâmbătă 20:00–22:30, mood romantic, decide pentru noi și dă-mi 3 alternative cu pro/contra.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Familie + restricții</div>
+      <div class="prompt">Familie cu copii, 75 minute, exclude știri, reality și horror. Decide tu.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Concentrat, fără reluări</div>
+      <div class="prompt">3 ore, mood concentrat, exclude cuvintele „retransmisie" și „best of". Spune-mi și ce a fost filtrat ca zgomot.</div>
+    </div>
+  </div>
+
+  <h3>Browsing & listare</h3>
+  <div class="grid grid-2">
+    <div class="prompt-card">
+      <div class="label">Now on TV</div>
+      <div class="prompt">Ce se uită chiar acum pe canalele principale, exclude știrile?</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Search</div>
+      <div class="prompt">Caută documentare despre spațiu sâmbătă pe Discovery sau National Geographic.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Prime time</div>
+      <div class="prompt">Ce e la prime time mâine seară pe canalele generaliste?</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Title lookup</div>
+      <div class="prompt">E Avatar pe Netflix sau alt streaming? Și când se mai difuzează la TV?</div>
+    </div>
+  </div>
+
+  <h3>Comparații & planificare</h3>
+  <div class="grid grid-2">
+    <div class="prompt-card">
+      <div class="label">Compare</div>
+      <div class="prompt">Compară Pulp Fiction, Inception și Interstellar pentru mood captivant. Cine câștigă?</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Couple</div>
+      <div class="prompt">Eu vreau captivant, partenera vrea romantic. Găsește ceva OK pentru ambii diseară.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Plan evening</div>
+      <div class="prompt">Plănuiește-mi seara 20:00 la 23:30 cu mood concentrat, max 3 segmente.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="label">Explain</div>
+      <div class="prompt">De ce ai recomandat acel program pentru mood-ul meu? Dă-mi breakdown-ul complet.</div>
+    </div>
+  </div>
+
+  <h2>Diagnostice live</h2>
+  <p>Endpoint-ul <code>/mcp/health</code> returnează JSON cu starea curentă a serverului:</p>
+  <pre><code>curl https://tv.madeinro.eu/mcp/health</code></pre>
+  <pre><code>{
+  "ok": true,
+  "service": "rotv-mcp",
+  "version": "3.0.x",
+  "uptime_s": 1234,
+  "cache_loaded_at": "2026-06-05T18:00:00.000Z"
+}</code></pre>
+
+  <p>Pentru a verifica freshness-ul datelor direct (fără ChatGPT):</p>
+  <pre><code>curl -X POST https://tv.madeinro.eu/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+       "params":{"name":"tv_check_freshness","arguments":{}}}'</code></pre>
+
+  <h2>Arhitectură pe scurt</h2>
+  <ul>
+    <li><strong>Node.js v24</strong> + Express + Model Context Protocol SDK (<code>StreamableHTTPServerTransport</code>, stateless)</li>
+    <li><strong>Read-only consumer</strong> al datelor scrise de alt serviciu pe același VPS (no DB, no pipeline duplication)</li>
+    <li><strong>JSON file cache</strong> in-memory cu <code>fs.watch</code> debounced + safety-net 5min</li>
+    <li><strong>Cloudflare tunnel</strong> path-based ingress: <code>tv.madeinro.eu/mcp/*</code> → localhost:3010</li>
+    <li><strong>pm2 fork mode</strong>, zero-downtime reload, max_memory_restart 256M</li>
+    <li><strong>Versioned outputSchemas</strong> declarate pentru toate 12 tool-uri (ChatGPT validează structurat răspunsurile)</li>
+  </ul>
+
+  <h2>De ce există</h2>
+  <p>
+    rotv-mcp începe cu observația simplă: utilizatorul tipic petrece <strong>30 de minute alegând</strong> între TV, Netflix, HBO, Disney+, YouTube. Problema nu e lipsa de conținut. E excesul.
+  </p>
+  <p>
+    Concierge-ul nu e un ghid TV. Nu listează. Nu sugerează 10 opțiuni. Devine <strong>filtru personal de zgomot</strong> și răspunde la întrebarea practică: <em>„Având tot ce e disponibil acum, ce alegi pentru următoarele X minute din viața mea?"</em>
+  </p>
+  <p>
+    Și o spune cu confidence%, anti-noise count, dedup transparent și alternative care nu sunt doar „următoarele pe listă", ci aleasă pe buckets (sursă diferită / mai lung / mai scurt cu rating mai mare / gen diferit).
+  </p>
+
+  <footer>
+    <p>
+      rotv-mcp <span id="footer-version">v?</span> — built on top of <a href="https://tv.madeinro.eu">tv.madeinro.eu</a><br>
+      Public read-only MCP server for live Romanian TV + streaming.
+    </p>
+  </footer>
+</div>
+
+<script>
+(async function() {
+  try {
+    const r = await fetch('/mcp/health', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    document.getElementById('s-version').textContent = j.version || '—';
+    document.getElementById('footer-version').textContent = 'v' + (j.version || '?');
+    const up = Math.max(0, j.uptime_s || 0);
+    const h = Math.floor(up / 3600);
+    const m = Math.floor((up % 3600) / 60);
+    document.getElementById('s-uptime').textContent = (h ? h + 'h ' : '') + m + 'm';
+    if (j.cache_loaded_at) {
+      const cacheTime = new Date(j.cache_loaded_at);
+      const ageMin = Math.round((Date.now() - cacheTime.getTime()) / 60000);
+      const label = ageMin < 1 ? 'now' : ageMin < 60 ? (ageMin + ' min ago') : (Math.floor(ageMin / 60) + 'h ago');
+      document.getElementById('s-cache').textContent = label;
+    }
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
