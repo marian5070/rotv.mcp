@@ -169,7 +169,7 @@
   <h2>Ce face</h2>
   <p>
     <strong>rotv-mcp</strong> conectează ChatGPT (și orice alt client MCP) la grila live a ~254 canale TV din România și la cataloagele de streaming disponibile aici: Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime.
-    12 tool-uri pentru căutare, recomandare, planificare seară și — cel mai important — <strong>decizie unică contextuală</strong>.
+    13 tool-uri pentru căutare, recomandare, planificare seară și — cel mai important — <strong>decizie unică contextuală</strong>.
   </p>
 
   <p>
@@ -188,26 +188,54 @@
     <li><strong>Timeline cu pauze</strong> — inserare automată de pauze între segmente (≥ 5 min)</li>
   </ul>
 
-  <h2>Cum o conectezi în ChatGPT</h2>
+  <h2>Conectează serverul la asistentul tău AI</h2>
+  <p>Server public, read-only, fără cheie și fără cont — orice client MCP compatibil se poate conecta. Rețetele de mai jos sunt testate pe acest server sau pe serverele-surori din aceeași familie.</p>
+
+  <h3>Gemini CLI</h3>
+  <ol>
+    <li>Instalează CLI-ul: <code>npm install -g @google/gemini-cli</code></li>
+    <li>Adaugă serverul în <code>~/.gemini/settings.json</code>:
+<pre><code>{
+  "mcpServers": {
+    "rotv": { "httpUrl": "https://tv.madeinro.eu/mcp" }
+  }
+}</code></pre></li>
+    <li>Pornește <code>gemini</code> și întreabă: <em>„ce e important diseară la TV?"</em> — Gemini alege singur <code>tv_important_today</code> / <code>tv_concierge</code> (testat pe 10 iul 2026, apeluri vizibile în log-urile serverului)</li>
+  </ol>
+  <div class="callout">
+    <strong>Aplicația Gemini</strong> (gemini.google.com/apps → custom app link) acceptă și ea MCP-uri custom, dar momentan doar în SUA, cu abonament Ultra — în EEA folosește Gemini CLI.
+  </div>
+
+  <h3>Claude Code / claude.ai</h3>
+  <ol>
+    <li>În Claude Code, o singură comandă: <code>claude mcp add --transport http rotv https://tv.madeinro.eu/mcp</code></li>
+    <li>Pe claude.ai: <kbd>Settings</kbd> → <kbd>Connectors</kbd> → <kbd>Add custom connector</kbd> → URL-ul de mai sus, fără autentificare</li>
+  </ol>
+
+  <h3>ChatGPT</h3>
   <ol>
     <li>Deschide ChatGPT și mergi la <kbd>Settings</kbd> → <kbd>Connectors</kbd> (sau <kbd>Apps & Connectors</kbd>, în funcție de versiune)</li>
     <li>Click pe <kbd>Add custom connector</kbd> (sau <kbd>+ New connector</kbd>)</li>
     <li>În câmpul <strong>Server URL</strong> introdu: <code>https://tv.madeinro.eu/mcp</code></li>
     <li>În <strong>Authorization</strong>: lasă pe <strong>None</strong> (server-ul e public read-only)</li>
-    <li>Click <kbd>Connect</kbd>. La aprobare ar trebui să vezi <strong>12 tool-uri</strong> disponibile, inclusiv <code>tv_concierge</code></li>
+    <li>Click <kbd>Connect</kbd>. La aprobare ar trebui să vezi <strong>13 tool-uri</strong> disponibile, inclusiv <code>tv_concierge</code></li>
   </ol>
 
   <div class="callout">
-    <strong>Dacă tool-urile par cache-uite</strong> (vezi doar 11 sau lipsește <code>tv_concierge</code>): Disconnect + Reconnect cu aceeași URL. ChatGPT face fresh <code>tools/list</code> la reconectare.
+    <strong>Dacă tool-urile par cache-uite</strong> (vezi mai puține sau lipsește <code>tv_important_today</code>): Disconnect + Reconnect cu aceeași URL — clientul face fresh <code>tools/list</code> la reconectare.
   </div>
 
-  <h2>Cele 12 tool-uri</h2>
+  <h2>Cele 13 tool-uri</h2>
   <table>
     <thead><tr><th>Tool</th><th>Ce face</th></tr></thead>
     <tbody>
       <tr>
         <td class="tool-name">tv_concierge <span class="badge">v3</span></td>
         <td>Decide pentru tine — UN titlu (TV sau streaming) cu confidence%, breakdown pe 5 axe, 0-3 alternative diverse. Anti-noise + dedup + lookahead built-in.</td>
+      </tr>
+      <tr>
+        <td class="tool-name">tv_important_today <span class="badge">v3.1</span></td>
+        <td>Ce contează cu adevărat azi la TV: meciuri de Cupă Mondială / Euro / Champions League, finale, faze eliminatorii, echipa și cluburile României — fiecare cu dovada citată din textul EPG.</td>
       </tr>
       <tr>
         <td class="tool-name">tv_now_on_tv <span class="badge">v1</span></td>
@@ -348,7 +376,7 @@
     <li><strong>JSON file cache</strong> in-memory cu <code>fs.watch</code> debounced + safety-net 5min</li>
     <li><strong>Cloudflare tunnel</strong> path-based ingress: <code>tv.madeinro.eu/mcp/*</code> → localhost:3010</li>
     <li><strong>pm2 fork mode</strong>, zero-downtime reload, max_memory_restart 256M</li>
-    <li><strong>Versioned outputSchemas</strong> declarate pentru toate 12 tool-uri (ChatGPT validează structurat răspunsurile)</li>
+    <li><strong>Versioned outputSchemas</strong> declarate pentru toate 13 tool-uri (ChatGPT validează structurat răspunsurile)</li>
   </ul>
 
   <h2>De ce există</h2>
