@@ -124,4 +124,32 @@ export function registerTools(server) {
   }
 }
 
+// Catalogul pentru /mcp/help: nume + titlu + descrierea EXACTĂ din tools/list
+// (sursa unică — tabelul din help.html se generează de aici la startup).
+// Versiunile v1/v2 se deduc; doar reperele v3/v3.1 sunt numite explicit.
+const V1_TOOLS = new Set([
+  'tv_now_on_tv',
+  'tv_search_program',
+  'tv_get_prime_time',
+  'tv_recommend_today',
+  'tv_get_title_details',
+]);
+const NAMED_VERSIONS = { tv_concierge: 'v3', tv_important_today: 'v3.1' };
+const FEATURED = ['tv_concierge', 'tv_important_today'];
+
+export function toolsCatalog() {
+  const version = (n) => NAMED_VERSIONS[n] || (V1_TOOLS.has(n) ? 'v1' : 'v2');
+  const byName = new Map(TOOL_DEFS.map((d) => [d.name, d]));
+  const ordered = [
+    ...FEATURED.map((n) => byName.get(n)),
+    ...TOOL_DEFS.filter((d) => !FEATURED.includes(d.name)),
+  ].filter(Boolean);
+  return ordered.map((d) => ({
+    name: d.name,
+    title: d.config.title,
+    description: d.config.description,
+    version: version(d.name),
+  }));
+}
+
 export { TOOL_HANDLERS, TOOL_DEFS };

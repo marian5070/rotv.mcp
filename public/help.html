@@ -169,7 +169,7 @@
   <h2>Ce face</h2>
   <p>
     <strong>rotv-mcp</strong> conectează ChatGPT (și orice alt client MCP) la grila live a ~254 canale TV din România și la cataloagele de streaming disponibile aici: Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime.
-    13 tool-uri pentru căutare, recomandare, planificare seară și — cel mai important — <strong>decizie unică contextuală</strong>.
+    <span class="tool-count">13</span> tool-uri pentru căutare, recomandare, planificare seară și — cel mai important — <strong>decizie unică contextuală</strong>.
   </p>
 
   <p>
@@ -218,17 +218,19 @@
     <li>Click pe <kbd>Add custom connector</kbd> (sau <kbd>+ New connector</kbd>)</li>
     <li>În câmpul <strong>Server URL</strong> introdu: <code>https://tv.madeinro.eu/mcp</code></li>
     <li>În <strong>Authorization</strong>: lasă pe <strong>None</strong> (server-ul e public read-only)</li>
-    <li>Click <kbd>Connect</kbd>. La aprobare ar trebui să vezi <strong>13 tool-uri</strong> disponibile, inclusiv <code>tv_concierge</code></li>
+    <li>Click <kbd>Connect</kbd>. La aprobare ar trebui să vezi <strong><span class="tool-count">13</span> tool-uri</strong> disponibile, inclusiv <code>tv_concierge</code></li>
   </ol>
 
   <div class="callout">
     <strong>Dacă tool-urile par cache-uite</strong> (vezi mai puține sau lipsește <code>tv_important_today</code>): Disconnect + Reconnect cu aceeași URL — clientul face fresh <code>tools/list</code> la reconectare.
   </div>
 
-  <h2>Cele 13 tool-uri</h2>
+  <h2>Cele <span class="tool-count">13</span> tool-uri</h2>
+  <p>Numele, versiunea și descrierea vin direct din definițiile serverului — exact ce primește agentul la <code>tools/list</code> (de aceea descrierile sunt în engleză).</p>
   <table>
     <thead><tr><th>Tool</th><th>Ce face</th></tr></thead>
     <tbody>
+      <!-- tools-rows:start -->
       <tr>
         <td class="tool-name">tv_concierge <span class="badge">v3</span></td>
         <td>Decide pentru tine — UN titlu (TV sau streaming) cu confidence%, breakdown pe 5 axe, 0-3 alternative diverse. Anti-noise + dedup + lookahead built-in.</td>
@@ -281,6 +283,7 @@
         <td class="tool-name">tv_check_freshness <span class="badge">v2</span></td>
         <td>Status fresh/stale per sursă (EPG normalizat, EPG homepage, streaming catalog)</td>
       </tr>
+    <!-- tools-rows:end -->
     </tbody>
   </table>
 
@@ -376,7 +379,7 @@
     <li><strong>JSON file cache</strong> in-memory cu <code>fs.watch</code> debounced + safety-net 5min</li>
     <li><strong>Cloudflare tunnel</strong> path-based ingress: <code>tv.madeinro.eu/mcp/*</code> → localhost:3010</li>
     <li><strong>pm2 fork mode</strong>, zero-downtime reload, max_memory_restart 256M</li>
-    <li><strong>Versioned outputSchemas</strong> declarate pentru toate 13 tool-uri (ChatGPT validează structurat răspunsurile)</li>
+    <li><strong>Versioned outputSchemas</strong> declarate pentru toate <span class="tool-count">13</span> tool-uri (ChatGPT validează structurat răspunsurile)</li>
   </ul>
 
   <h2>De ce există</h2>

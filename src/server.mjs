@@ -6,13 +6,39 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 import { loadAll, startWatchers, getLoadedAt } from './data/store.mjs';
-import { registerTools } from './tools/index.mjs';
+import { registerTools, toolsCatalog } from './tools/index.mjs';
 import { rateLimit } from './middleware/rate-limit.mjs';
 import { authOptional } from './middleware/auth.mjs';
 import { accessLog } from './middleware/log.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const HELP_HTML = readFileSync(join(__dirname, '..', 'public', 'help.html'), 'utf8');
+
+// Tabelul de unelte din help.html se generează la startup din toolsCatalog()
+// (aceleași definiții pe care clienții le văd la tools/list — zero drift).
+// Rândurile statice dintre markeri rămân fallback dacă markerii lipsesc.
+const escapeHtml = (s) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function renderHelp(raw) {
+  const catalog = toolsCatalog();
+  const rows = catalog
+    .map(
+      (t) =>
+        `      <tr>\n        <td class="tool-name">${t.name} <span class="badge">${t.version}</span></td>\n        <td><strong>${escapeHtml(t.title)}.</strong> ${escapeHtml(t.description)}</td>\n      </tr>`
+    )
+    .join('\n');
+  return raw
+    .replace(
+      /<!-- tools-rows:start -->[\s\S]*?<!-- tools-rows:end -->/,
+      `<!-- tools-rows:start -->\n${rows}\n      <!-- tools-rows:end -->`
+    )
+    .replace(
+      /<span class="tool-count">\d+<\/span>/g,
+      `<span class="tool-count">${catalog.length}</span>`
+    );
+}
+const HELP_HTML = renderHelp(
+  readFileSync(join(__dirname, '..', 'public', 'help.html'), 'utf8')
+);
 
 await loadAll();
 startWatchers();
