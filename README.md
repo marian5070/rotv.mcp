@@ -2,8 +2,10 @@
 
 Read-only [Model Context Protocol](https://modelcontextprotocol.io/) server for
 [tv.madeinro.eu](https://tv.madeinro.eu) — Romanian TV guide, streaming catalog and an
-entertainment concierge, exposed as 13 tools to any MCP-compatible client
-(Claude, ChatGPT, or your own agent).
+entertainment concierge, exposed as 14 tools to any MCP-compatible client
+(Claude, ChatGPT, or your own agent) — including an
+[MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/)
+visual tonight-card.
 
 **Live endpoint:** `https://tv.madeinro.eu/mcp` · no auth · streamable HTTP
 **Registry:** [`eu.madeinro/rotv-mcp`](https://registry.modelcontextprotocol.io/?q=rotv) (official MCP registry)
@@ -70,6 +72,12 @@ per-call confirmation. Time references accepted throughout: `now`, `tonight`,
 | `tv_concierge` | **One decision, not a list.** A single primary pick for your free-time window with a confidence % and full reasoning, plus up to 3 diverse alternatives with explicit trade-offs. Built-in anti-noise filter (news/politics/reality), title dedup, opportunity-cost lookahead — and event awareness (below). |
 | `tv_important_today` | **What actually matters today**: World Cup / Euro / Champions League matches, finals, knockout games, Romania's team and clubs. Every event ships with quoted evidence from the EPG text. |
 
+### MCP Apps (v3.2)
+
+| Tool | What it does |
+|---|---|
+| `tv_tonight_card` | **Tonight's picks as a visual card.** The daily decision (importance-scored major event, or a deterministic prime-time film fallback) plus one pick per vertical — TV, streaming (official Netflix RO top 10), theater (online + stage), cinema (box office ∩ today's screenings) — and measured stats. Declares `_meta.ui.resourceUri → ui://rotv/tonight-card`; hosts supporting the [MCP Apps extension](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) (Claude, ChatGPT, VS Code, Goose) render it as an interactive card in a sandboxed iframe, everyone else gets the same structured JSON. |
+
 ## The importance layer
 
 Romanian EPG data is *diffuse*: every program's genre is literally `"General"`,
@@ -98,10 +106,12 @@ MCP client ── POST /mcp (streamable HTTP, stateless: fresh server per reques
         express (loopback :3010)
         access log → rate limit (60 rpm) → optional bearer auth
                  │
-        13 tools over in-memory EPG/streaming caches
+        14 tools over in-memory EPG/streaming caches
+        + 1 MCP Apps UI resource (ui://rotv/tonight-card)
                  │
         JSON artifacts produced by the rotv-guide pipeline
-        (epg-normalized.json · epg-homepage.json · streaming-full.json)
+        (epg-normalized.json · epg-homepage.json · streaming-full.json
+         · tonight-picks.json)
         hot-reloaded via fs.watch (debounced 750 ms)
 ```
 
