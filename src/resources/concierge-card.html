@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recomandarea serii — rotv concierge</title>
+<style>
+  /* Self-contained (MCP Apps CSP). Same visual language as the tonight-card:
+     amber accent, system fonts, both themes. */
+  :root {
+    --bg: #f6f4ef; --card: #ffffff; --fg: #1a1d24; --muted: #5c6270;
+    --line: #e3e0d8; --accent: #b45309; --accent-soft: #fef3c7; --chip: #eef1f6;
+    --ok: #1e7c46;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c; --card: #1a1e28; --fg: #edeef2; --muted: #9aa1b0;
+      --line: #2a2f3c; --accent: #f59e0b; --accent-soft: #3a2e14; --chip: #232936;
+      --ok: #58c184;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--fg); padding: 12px; }
+  .wrap { max-width: 680px; margin: 0 auto; }
+  .eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+             color: var(--muted); margin-bottom: 8px; }
+  .event {
+    background: var(--accent-soft); color: var(--accent); border-radius: 10px;
+    padding: 8px 14px; font-size: 13px; margin-bottom: 10px;
+  }
+  .primary { background: var(--card); border: 1px solid var(--line);
+             border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; }
+  .kind { display: inline-block; background: var(--chip); color: var(--muted);
+          border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 600;
+          letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+  h1 { font-size: 23px; line-height: 1.2; margin-bottom: 6px; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .meta b { color: var(--fg); }
+  .conf { display: flex; align-items: baseline; gap: 8px; margin-top: 10px; }
+  .conf .pct { font-size: 18px; font-weight: 700; color: var(--accent);
+               font-variant-numeric: tabular-nums; }
+  .conf .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase;
+               letter-spacing: .08em; }
+  .why { margin-top: 10px; padding-left: 18px; font-size: 13px; color: var(--muted); }
+  .why li { margin-bottom: 3px; }
+  h2 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+       color: var(--muted); margin: 14px 0 8px; }
+  .alts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+          gap: 8px; }
+  .alt { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+         padding: 10px 12px; }
+  .alt .t { font-weight: 600; font-size: 13px; line-height: 1.3; }
+  .alt .m { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .alt .tradeoff { font-size: 11px; color: var(--muted); margin-top: 5px;
+                   font-style: italic; }
+  .alt .cp { font-size: 11px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+          font-size: 11px; color: var(--muted); margin-top: 12px; }
+  .foot a { color: var(--accent); text-decoration: none; }
+  #state { color: var(--muted); padding: 24px 8px; text-align: center; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="state">Aleg recomandarea…</div>
+  <div id="card" class="hidden">
+    <div class="eyebrow">Recomandarea concierge · o decizie, nu o listă</div>
+    <div class="event hidden" id="event"></div>
+    <div class="primary">
+      <span class="kind" id="kind"></span>
+      <h1 id="title"></h1>
+      <div class="meta" id="meta"></div>
+      <div class="conf">
+        <span class="pct" id="conf-pct"></span>
+        <span class="lbl" id="conf-lbl"></span>
+      </div>
+      <ul class="why" id="why"></ul>
+    </div>
+    <h2 id="alts-h" class="hidden">Alternative, cu compromisul pe față</h2>
+    <div class="alts" id="alts"></div>
+    <div class="foot">
+      <span id="window"></span>
+      <a href="https://tv.madeinro.eu" target="_blank" rel="noopener">tv.madeinro.eu →</a>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var KIND = { tv: 'TV', streaming: 'Streaming', cinema: 'Cinema', teatru: 'Teatru' };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function el(id) { return document.getElementById(id); }
+  // "2026-07-14 21:50 (Europe/Bucharest)" -> "21:50"
+  function hhmm(s) {
+    var m = /\b(\d{2}:\d{2})\b/.exec(String(s || ''));
+    return m ? m[1] : '';
+  }
+
+  function render(d) {
+    if (!d || !d.decision) { el('state').textContent = 'Recomandarea nu e disponibilă.'; return; }
+    var dec = d.decision;
+    var seg = (dec.segments && dec.segments[0]) || {};
+
+    if (d.important_today && d.important_today.length) {
+      var ev = d.important_today[0];
+      el('event').textContent = 'Eveniment important azi: ' + ev.title +
+        ' — ' + ev.channel + ', ' + hhmm(ev.start_local);
+      el('event').classList.remove('hidden');
+    }
+
+    el('kind').textContent = KIND[dec.primary_kind] || dec.primary_kind || '';
+    el('title').textContent = dec.primary_title || '';
+    var meta = [];
+    var where = seg.channel_name || seg.provider_name;
+    if (where) meta.push('<b>' + esc(where) + '</b>');
+    var t = hhmm(seg.start_local);
+    if (t) meta.push(t);
+    if (seg.duration_min) meta.push(seg.duration_min + ' min');
+    if (seg.year) meta.push(esc(seg.year));
+    if (seg.extracted_genres && seg.extracted_genres.length) meta.push(esc(seg.extracted_genres.join(', ')));
+    el('meta').innerHTML = meta.join(' · ');
+
+    if (typeof dec.confidence_pct === 'number') {
+      el('conf-pct').textContent = dec.confidence_pct + '%';
+      el('conf-lbl').textContent = 'încredere ' + (dec.confidence_label || '') +
+        ' — model dezvăluit, nu probabilitate';
+    }
+
+    (d.reasoning || []).slice(0, 4).forEach(function (r) {
+      var li = document.createElement('li');
+      li.textContent = r;
+      el('why').appendChild(li);
+    });
+
+    var alts = d.alternatives || [];
+    if (alts.length) {
+      el('alts-h').classList.remove('hidden');
+      alts.slice(0, 3).forEach(function (a) {
+        var box = document.createElement('div');
+        box.className = 'alt';
+        var m = [];
+        if (a.channel_name) m.push(esc(a.channel_name));
+        var at = hhmm(a.start_local);
+        if (at) m.push(at);
+        if (a.duration_min) m.push(a.duration_min + ' min');
+        box.innerHTML = '<div class="t">' + esc(a.title) + '</div>' +
+          '<div class="m">' + m.join(' · ') +
+          (typeof a.confidence_pct === 'number' ? ' · <span class="cp">' + a.confidence_pct + '%</span>' : '') + '</div>' +
+          (a.reason_not_picked ? '<div class="tradeoff">' + esc(a.reason_not_picked) + '</div>' : '');
+        el('alts').appendChild(box);
+      });
+    }
+
+    var w = d.window || {};
+    var bits = [];
+    if (w.start_local) bits.push('fereastra ta: ' + hhmm(w.start_local) + '–' + hhmm(w.end_local));
+    if (d.anti_noise && typeof d.anti_noise.filtered_count === 'number') {
+      bits.push(d.anti_noise.filtered_count + ' programe-zgomot filtrate');
+    }
+    el('window').textContent = bits.join(' · ');
+
+    el('state').classList.add('hidden');
+    el('card').classList.remove('hidden');
+  }
+
+  function extractResult(params) {
+    if (params && params.structuredContent) return params.structuredContent;
+    try {
+      var text = params && params.content && params.content[0] && params.content[0].text;
+      return text ? JSON.parse(text) : null;
+    } catch (e) { return null; }
+  }
+
+  window.addEventListener('message', function (evt) {
+    var msg = evt.data;
+    if (!msg || msg.jsonrpc !== '2.0') return;
+    if (msg.method === 'ui/notifications/tool-result') render(extractResult(msg.params));
+  });
+
+  window.parent.postMessage({ jsonrpc: '2.0', id: 1, method: 'ui/initialize', params: {} }, '*');
+  window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized' }, '*');
+})();
+</script>
+</body>
+</html>

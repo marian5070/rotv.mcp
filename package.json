@@ -1,6 +1,6 @@
 {
   "name": "rotv-mcp",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Read-only MCP server for tv.madeinro.eu — exposes live Romanian TV schedule and streaming catalog to ChatGPT and other MCP clients.",
   "private": true,
   "type": "module",

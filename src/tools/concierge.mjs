@@ -672,4 +672,9 @@ export const conciergeTool = {
     inputSchema: ConciergeInput,
     outputSchema: ConciergeOutput,
   },
+  // MCP Apps: hosts with the UI extension render the decision as a visual
+  // card (primary + confidence + alternatives); others keep the JSON.
+  _meta: {
+    ui: { resourceUri: 'ui://rotv/concierge-card', visibility: ['model', 'app'] },
+  },
 };

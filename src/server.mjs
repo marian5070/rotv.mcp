@@ -63,7 +63,7 @@ app.get('/mcp/health', (_req, res) => {
   res.json({
     ok: true,
     service: 'rotv-mcp',
-    version: '3.2.0',
+    version: '3.3.0',
     uptime_s: Math.round(process.uptime()),
     cache_loaded_at: getLoadedAt()?.toISOString() ?? null,
   });
@@ -76,7 +76,7 @@ app.get('/mcp/help', (_req, res) => {
 });
 
 app.post('/mcp', async (req, res) => {
-  const server = new McpServer({ name: 'rotv-mcp', version: '3.2.0' });
+  const server = new McpServer({ name: 'rotv-mcp', version: '3.3.0' });
   registerTools(server);
   registerResources(server);
   const transport = new StreamableHTTPServerTransport({

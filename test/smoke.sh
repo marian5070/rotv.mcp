@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Smoke tests for rotv-mcp.
+#   NOTE: run with an elevated rate limit — the suite fires ~26 rapid requests,
+#   above the default 60rpm burst of 20: RATE_LIMIT_RPM=600 pm2 restart rotv-mcp
+#   --update-env, run the suite, then restore RATE_LIMIT_RPM=60.
 #   Local:  BASE=http://127.0.0.1:3010 bash test/smoke.sh
 #   Tunnel: BASE=https://tv.madeinro.eu  bash test/smoke.sh
 set -uo pipefail
@@ -84,9 +87,10 @@ header "14. v2 tv_check_freshness"
 R=$(jrpc '{"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"tv_check_freshness","arguments":{}}}' 2>/dev/null || true)
 if printf '%s' "$R" | grep -q '"overall_stale"' && printf '%s' "$R" | grep -q '"expected_next_refresh_at"'; then ok "tv_check_freshness returns sources + next refresh"; else ko "tv_check_freshness failed"; printf '   %s\n' "$R" | head -c 600; fi
 
-header "15. version 3.0.3"
+header "15. version matches package.json"
 H=$(curl -fsS "$BASE/mcp/health" 2>/dev/null || true)
-if printf '%s' "$H" | grep -q '"version":"3.0.3"'; then ok "version 3.0.3"; else ko "version mismatch: $H"; fi
+PKG_V=$(node -p "require('./package.json').version")
+if printf '%s' "$H" | grep -q "\"version\":\"$PKG_V\""; then ok "version $PKG_V"; else ko "version mismatch: $H"; fi
 
 header "16. v3 tv_concierge default 2h evening + noise filter ON"
 R=$(jrpc '{"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"tv_concierge","arguments":{"window":{"start":"20:00","duration_min":120},"mood":"obosit"}}}' 2>/dev/null || true)

@@ -1,6 +1,7 @@
 // rotv-mcp UI resources — MCP Apps extension (io.modelcontextprotocol/ui).
-// One predeclared template: the tonight-card, rendered by capable hosts in a
-// sandboxed iframe and fed the tv_tonight_card tool result over postMessage.
+// Two predeclared templates, rendered by capable hosts in sandboxed iframes
+// and fed the tool results over postMessage: the tonight-card
+// (tv_tonight_card) and the concierge-card (tv_concierge).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +13,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // text/html;profile=mcp-app — other types are reserved.
 const MCP_APP_HTML = 'text/html;profile=mcp-app';
 
-const TEMPLATE = fs.readFileSync(path.join(__dirname, 'tonight-card.html'), 'utf8');
+const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
+const TONIGHT_TEMPLATE = read('tonight-card.html');
+const CONCIERGE_TEMPLATE = read('concierge-card.html');
 
 export function registerResources(server) {
   server.registerResource(
@@ -27,7 +30,23 @@ export function registerResources(server) {
       mimeType: MCP_APP_HTML,
     },
     async (uri) => ({
-      contents: [{ uri: uri.href, mimeType: MCP_APP_HTML, text: TEMPLATE }],
+      contents: [{ uri: uri.href, mimeType: MCP_APP_HTML, text: TONIGHT_TEMPLATE }],
+    })
+  );
+
+  server.registerResource(
+    'concierge-card',
+    'ui://rotv/concierge-card',
+    {
+      title: 'Concierge decision card (MCP Apps template)',
+      description:
+        'Self-contained HTML template for the tv_concierge tool: the single primary decision with ' +
+        'channel/platform, local time, disclosed confidence and reasoning, the important-event banner ' +
+        'when present, and up to 3 alternatives with their explicit trade-offs.',
+      mimeType: MCP_APP_HTML,
+    },
+    async (uri) => ({
+      contents: [{ uri: uri.href, mimeType: MCP_APP_HTML, text: CONCIERGE_TEMPLATE }],
     })
   );
 }
