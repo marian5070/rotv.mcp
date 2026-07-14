@@ -6,6 +6,7 @@ export const FILES = Object.freeze({
   epgFull:   path.join(DATA_DIR, 'epg-normalized.json'),
   epgHome:   path.join(DATA_DIR, 'epg-homepage.json'),
   streaming: path.join(DATA_DIR, 'streaming-full.json'),
+  tonight:   path.join(DATA_DIR, 'tonight-picks.json'),
 });
 
 export { DATA_DIR };

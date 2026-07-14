@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "eu.madeinro/rotv-mcp",
-  "description": "Romanian TV guide MCP: live listings, prime time, title search, streaming info, recommendations.",
-  "version": "3.1.2",
+  "description": "Romanian TV guide MCP: live listings, prime time, title search, streaming info, recommendations. Includes an MCP Apps visual tonight-card (ui://rotv/tonight-card).",
+  "version": "3.2.0",
   "websiteUrl": "https://tv.madeinro.eu",
   "remotes": [
     {

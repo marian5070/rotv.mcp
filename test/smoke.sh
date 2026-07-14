@@ -27,10 +27,10 @@ header "1. initialize"
 INIT=$(jrpc '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}' 2>/dev/null || true)
 if printf '%s' "$INIT" | grep -q '"serverInfo"'; then ok "initialize returns serverInfo"; else ko "initialize failed: $INIT"; fi
 
-header "2. tools/list (expect 13 = 5 v1 + 6 v2 + 1 v3 + 1 v3.1)"
+header "2. tools/list (expect 14 = 5 v1 + 6 v2 + 1 v3 + 1 v3.1 + 1 v3.2)"
 TOOLS=$(jrpc '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' 2>/dev/null || true)
 COUNT=$(printf '%s' "$TOOLS" | grep -oE '"name":"tv_[a-z_]+"' | sort -u | wc -l | tr -d ' ')
-if [ "$COUNT" = "13" ]; then ok "13 tools registered"; else ko "expected 13 tools, got $COUNT"; printf '   %s\n' "$TOOLS" | head -c 500; fi
+if [ "$COUNT" = "14" ]; then ok "14 tools registered"; else ko "expected 14 tools, got $COUNT"; printf '   %s\n' "$TOOLS" | head -c 500; fi
 
 header "3. tv_now_on_tv main, exclude_news"
 R=$(jrpc '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tv_now_on_tv","arguments":{"scope":"main","exclude_news":true,"limit":10}}}' 2>/dev/null || true)
@@ -111,7 +111,7 @@ if printf '%s' "$R" | grep -q '"confidence_pct"'; then ok "tv_concierge 30-min w
 header "21. v3.0.3 outputSchema declared on all 12 tools"
 TOOLS=$(jrpc '{"jsonrpc":"2.0","id":21,"method":"tools/list"}' 2>/dev/null || true)
 SCHEMA_COUNT=$(printf '%s' "$TOOLS" | grep -oE '"outputSchema":\{' | wc -l | tr -d ' ')
-if [ "$SCHEMA_COUNT" = "13" ]; then ok "all 13 tools expose outputSchema"; else ko "expected 13 outputSchema, got $SCHEMA_COUNT"; fi
+if [ "$SCHEMA_COUNT" = "14" ]; then ok "all 14 tools expose outputSchema"; else ko "expected 14 outputSchema, got $SCHEMA_COUNT"; fi
 
 header "22. v3.0.3 /mcp/help serves HTML"
 HELP_STATUS=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/mcp/help" 2>/dev/null || true)

@@ -13,6 +13,7 @@ import { checkFreshnessTool, handleCheckFreshness } from './check-freshness.mjs'
 
 import { conciergeTool, handleConcierge } from './concierge.mjs';
 import { importantTodayTool, handleImportantToday } from './important-today.mjs';
+import { tonightCardTool, handleTonightCard } from './tonight-card.mjs';
 
 import { freshnessEmbed } from '../lib/freshness.mjs';
 
@@ -34,6 +35,8 @@ const TOOL_HANDLERS = {
   tv_concierge: handleConcierge,
   // v3.1
   tv_important_today: handleImportantToday,
+  // v3.2 — MCP Apps
+  tv_tonight_card: handleTonightCard,
 };
 
 const V2_TOOLS = new Set([
@@ -51,6 +54,7 @@ const TOOL_DEFS = [
   recommendByMoodTool, planEveningTool, compareOptionsTool, findForCoupleTool, explainTool, checkFreshnessTool,
   conciergeTool,
   importantTodayTool,
+  tonightCardTool,
 ];
 
 function emitLog(line) {
@@ -118,7 +122,13 @@ export function registerTools(server) {
     const handler = wrap(def.name, TOOL_HANDLERS[def.name]);
     server.registerTool(
       def.name,
-      { ...def.config, annotations: { title: def.config.title, ...READ_ONLY_ANNOTATIONS } },
+      {
+        ...def.config,
+        annotations: { title: def.config.title, ...READ_ONLY_ANNOTATIONS },
+        // MCP Apps: tools may carry a UI template reference in _meta.ui;
+        // hosts without the extension ignore it (additive metadata).
+        ...(def._meta ? { _meta: def._meta } : {}),
+      },
       handler
     );
   }
@@ -134,7 +144,7 @@ const V1_TOOLS = new Set([
   'tv_recommend_today',
   'tv_get_title_details',
 ]);
-const NAMED_VERSIONS = { tv_concierge: 'v3', tv_important_today: 'v3.1' };
+const NAMED_VERSIONS = { tv_concierge: 'v3', tv_important_today: 'v3.1', tv_tonight_card: 'v3.2' };
 const FEATURED = ['tv_concierge', 'tv_important_today'];
 
 export function toolsCatalog() {

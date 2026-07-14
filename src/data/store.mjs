@@ -6,8 +6,9 @@ const cache = {
   epgFull: null,
   epgHome: null,
   streaming: null,
+  tonight: null,
   loadedAt: null,
-  fileMtimes: { epgFull: 0, epgHome: 0, streaming: 0 },
+  fileMtimes: { epgFull: 0, epgHome: 0, streaming: 0, tonight: 0 },
 };
 
 const debouncers = new Map();
@@ -77,4 +78,5 @@ export function startWatchers() {
 export const getEpgFull = () => cache.epgFull;
 export const getEpgHome = () => cache.epgHome;
 export const getStreaming = () => cache.streaming;
+export const getTonight = () => cache.tonight;
 export const getLoadedAt = () => cache.loadedAt;

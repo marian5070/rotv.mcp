@@ -7,6 +7,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 
 import { loadAll, startWatchers, getLoadedAt } from './data/store.mjs';
 import { registerTools, toolsCatalog } from './tools/index.mjs';
+import { registerResources } from './resources/index.mjs';
 import { rateLimit } from './middleware/rate-limit.mjs';
 import { authOptional } from './middleware/auth.mjs';
 import { accessLog } from './middleware/log.mjs';
@@ -75,8 +76,9 @@ app.get('/mcp/help', (_req, res) => {
 });
 
 app.post('/mcp', async (req, res) => {
-  const server = new McpServer({ name: 'rotv-mcp', version: '3.0.3' });
+  const server = new McpServer({ name: 'rotv-mcp', version: '3.2.0' });
   registerTools(server);
+  registerResources(server);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
