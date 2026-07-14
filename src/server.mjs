@@ -63,7 +63,7 @@ app.get('/mcp/health', (_req, res) => {
   res.json({
     ok: true,
     service: 'rotv-mcp',
-    version: '3.0.3',
+    version: '3.2.0',
     uptime_s: Math.round(process.uptime()),
     cache_loaded_at: getLoadedAt()?.toISOString() ?? null,
   });
