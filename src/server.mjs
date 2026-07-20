@@ -11,6 +11,7 @@ import { registerResources } from './resources/index.mjs';
 import { rateLimit } from './middleware/rate-limit.mjs';
 import { authOptional } from './middleware/auth.mjs';
 import { accessLog } from './middleware/log.mjs';
+import { restRouter } from './rest/router.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -56,6 +57,10 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '256kb' }));
 app.use(accessLog);
+// REST dinamic (/api/v1) — montat ÎNAINTE de rateLimit-ul global MCP și de
+// authOptional: are propriile limite/chei și se termină intern (404 propriu),
+// deci traficul REST nu atinge și nu modifică în niciun fel calea /mcp.
+app.use('/api/v1', restRouter);
 app.use(rateLimit({ rpm: Number(process.env.RATE_LIMIT_RPM || 60) }));
 app.use(authOptional);
 
@@ -67,6 +72,16 @@ app.get('/mcp/health', (_req, res) => {
     uptime_s: Math.round(process.uptime()),
     cache_loaded_at: getLoadedAt()?.toISOString() ?? null,
   });
+});
+
+// Domain verification pentru OpenAI Apps (ChatGPT plugin directory).
+// Portalul cere tokenul ca text simplu la /.well-known/openai-apps-challenge;
+// cloudflared rutează exact această cale către noi. Token setat prin env +
+// pm2 restart la momentul submisiei — fără rebuild de frontend.
+app.get('/.well-known/openai-apps-challenge', (_req, res) => {
+  const token = process.env.OPENAI_APPS_CHALLENGE;
+  if (!token) return res.status(404).type('text/plain').send('not configured');
+  res.type('text/plain').send(token);
 });
 
 app.get('/mcp/help', (_req, res) => {
