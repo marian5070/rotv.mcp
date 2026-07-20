@@ -57,14 +57,31 @@ function clientIp(req) {
 
 // ---------------------------------------------------------------- telemetrie
 
+// v2 — oglindă exactă a classifyUa din
+// /opt/apps/rotv-guide/server/middleware/api-usage.mjs (păstrează-le sincron).
+// Clase: openai|google|anthropic|xai|meta|crawler|script|browser|other.
+// Potrivire pe cuvinte (\b), nu substring-uri: fără 'gpt' gol, fără 'meta' gol.
+// Google e împărțit după intenție: gemini/google-extended = agenți AI ->
+// 'google'; googlebot/googleother/apis-google = crawlere de indexare ->
+// 'crawler'. Token-urile generice bot/crawler/spider vin DUPĂ cele specifice,
+// ca GPTBot/ClaudeBot să ajungă la platforma lor.
+const UA_CLASSES = [
+  ['openai', /\b(openai|chatgpt|gptbot|oai-searchbot)/],
+  ['google', /\b(gemini|google-extended)/],
+  ['anthropic', /\b(anthropic|claude)/],
+  ['xai', /\b(xai\b|grok)/],
+  ['meta', /\b(facebookexternalhit|meta-externalagent|meta-externalfetcher)/],
+  ['crawler', /\b(googlebot|googleother|apis-google|bingbot|duckduckbot|yandex|applebot|petalbot|ahrefsbot|semrushbot|mj12bot)|(bot|crawler|spider)\b/],
+  ['script', /\b(curl|wget|python|go-http|node-fetch|axios|okhttp|libwww)/],
+  ['browser', /\bmozilla/],
+];
+
 function uaClass(ua) {
   const s = String(ua || '').toLowerCase();
   if (!s) return 'other';
-  if (/openai|chatgpt|gptbot|oai-/.test(s)) return 'openai';
-  if (/google|gemini/.test(s)) return 'google';
-  if (/anthropic|claude/.test(s)) return 'anthropic';
-  if (/\bxai\b|grok/.test(s)) return 'xai';
-  if (/mozilla|safari|chrome|firefox|edg\//.test(s)) return 'browser';
+  for (const [cls, rx] of UA_CLASSES) {
+    if (rx.test(s)) return cls;
+  }
   return 'other';
 }
 
