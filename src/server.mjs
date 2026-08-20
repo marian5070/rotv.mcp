@@ -12,6 +12,7 @@ import { rateLimit } from './middleware/rate-limit.mjs';
 import { authOptional } from './middleware/auth.mjs';
 import { accessLog } from './middleware/log.mjs';
 import { restRouter } from './rest/router.mjs';
+import { handleA2ARpc, agentCard } from './a2a/index.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -61,6 +62,15 @@ app.use(accessLog);
 // authOptional: are propriile limite/chei și se termină intern (404 propriu),
 // deci traficul REST nu atinge și nu modifică în niciun fel calea /mcp.
 app.use('/api/v1', restRouter);
+// The A2A agent card is discovery metadata — public by spec (same exemption
+// the travel-trends reference makes): registered BEFORE rateLimit/authOptional
+// so scanners and registries can always read it.
+app.get('/a2a/card', (_req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.json(agentCard());
+});
+
 app.use(rateLimit({ rpm: Number(process.env.RATE_LIMIT_RPM || 60) }));
 app.use(authOptional);
 
@@ -128,6 +138,46 @@ app.all('/mcp', (_req, res) => {
     id: null,
     error: { code: -32000, message: 'Method not allowed — use POST' },
   });
+});
+
+// ── A2A (Agent2Agent) — JSON-RPC endpoint ──────────────────────────────────
+// Exposed publicly as https://tv.madeinro.eu/a2a via the rotv-guide proxy;
+// the card is served single-source from GET /a2a/card (registered above the
+// rate limiter) and mirrored by the guide at /.well-known/agent-card.json
+// and /.well-known/agent.json.
+app.post('/a2a', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.json(await handleA2ARpc(req.body));
+});
+
+// CORS preflight: a cross-origin JSON POST always sends OPTIONS first.
+app.options('/a2a', (_req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(204).end();
+});
+
+app.all('/a2a', (_req, res) => {
+  res.status(405).json({
+    jsonrpc: '2.0',
+    id: null,
+    error: { code: -32000, message: 'Method not allowed — use POST' },
+  });
+});
+
+// express.json failures on /a2a (malformed or oversized body) must come back
+// as a JSON-RPC Parse error envelope, not Express's HTML 400/413 page.
+app.use((err, req, res, next) => {
+  if (req.path === '/a2a' && (err?.type === 'entity.parse.failed' || err?.type === 'entity.too.large')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    return res.json({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32700, message: 'Parse error: body must be JSON (max 256kb)' },
+    });
+  }
+  next(err);
 });
 
 const PORT = Number(process.env.PORT) || 3010;
