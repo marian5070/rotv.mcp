@@ -61,8 +61,24 @@ function emitLog(line) {
   process.stdout.write(JSON.stringify(line) + '\n');
 }
 
+// SDK 1.29 calls a tool callback as (args, extra) when the tool has an
+// inputSchema and as (extra) when it has none; `extra.requestInfo.headers`
+// carries the HTTP headers of the request that made the call.
+function splitCallbackArgs(a, b) {
+  if (b !== undefined) return [a, b];
+  const looksExtra = a && typeof a === 'object' && 'signal' in a && 'sendNotification' in a;
+  return looksExtra ? [{}, a] : [a, undefined];
+}
+function uaOf(extra) {
+  const h = extra?.requestInfo?.headers;
+  if (!h) return '';
+  const v = typeof h.get === 'function' ? h.get('user-agent') : (h['user-agent'] ?? h['User-Agent']);
+  return String(v || '').slice(0, 80);
+}
+
 function wrap(name, handler) {
-  return async (args) => {
+  return async (a, b) => {
+    const [args, extra] = splitCallbackArgs(a, b);
     const t0 = Date.now();
     let quality = null;
     let ok = true;
@@ -100,6 +116,8 @@ function wrap(name, handler) {
         tool: name,
         ms: Date.now() - t0,
         ok,
+        // Client class per tool call (80-char UA, same field as the http line).
+        ua: uaOf(extra),
       };
       if (quality) line.q = quality;
       emitLog(line);
