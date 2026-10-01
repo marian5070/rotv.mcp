@@ -51,3 +51,16 @@ test('generic titles repeated across the day are never called replays', () => {
   const b = P('Fotbal', '2026-10-01T18:00:00Z', '2026-10-01T20:00:00Z');
   assert.equal(liveStatus(b, firstAiringIndex(src([['Digi Sport 1', [a, b]]]))).status, 'unknown');
 });
+
+test('explicit markers in the description: "Transmisiune directa" is live, "(Reluare)" is a replay', () => {
+  const live = { title: 'Inot', description: 'CUPA MONDIALA BAKU, AZERBAIDJAN\\r\\nComentator: Vlad Bucurescu\\r\\nTransmisiune directa.', start: '2026-10-01T14:00:00Z' };
+  const rerun = { title: 'Inot', description: 'CUPA MONDIALA BAKU, AZERBAIDJAN \\r\\nComentator: Vlad Bucurescu\\r\\n\\r\\n  (Reluare).', start: '2026-10-01T18:10:00Z' };
+  assert.equal(liveStatus(live).status, 'live');
+  assert.equal(liveStatus(rerun).status, 'replay');
+  assert.match(liveStatus(rerun).evidence, /descrierea spune/);
+});
+
+test('"reluare" in running text is not a marker', () => {
+  const p = { title: 'Magazin sportiv', description: 'Analizăm o reluare controversată din meciul de aseară.', start: '2026-10-01T18:10:00Z' };
+  assert.equal(liveStatus(p).status, 'unknown');
+});

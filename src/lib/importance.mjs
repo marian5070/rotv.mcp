@@ -61,6 +61,8 @@ export function assessImportance(program, channel = {}) {
   const description = program?.description ?? '';
   const titleN = normalize(title);
   const allN = normalize(`${title} ${description}`);
+  // Sursa scrie uneori „\\r\\n" ca text în descrieri.
+  const descN = normalize(description.replace(/\\[rn]/g, ' ')).trim();
 
   // Canalele de film, documentare și copii nu transmit evenimente: un titlu ca
   // „Misiune Finala" (film, FilmCafe) nu e o finală. Fără această gardă lua
@@ -78,11 +80,16 @@ export function assessImportance(program, channel = {}) {
   if (majorInTitle) {
     score = 0.9;
     reasons.push(`major competition in title: "${majorInTitle[0]}"`);
-  } else if (majorInDesc && channel?.category === 'Sport') {
+  } else if (majorInDesc && channel?.category === 'Sport' && descN.indexOf(majorInDesc[0]) >= 0 && descN.indexOf(majorInDesc[0]) <= 5) {
     // O competiție numită DOAR în descriere e de încredere numai pe un canal de
     // sport. Pe generaliste/film/altele e o emisiune DESPRE eveniment (magazin,
     // sinopsis, documentar) — cazul „România face bine" (TVR 2, 1 oct 2026), a
     // cărei descriere pomenea „Campionatul Mondial FIRST Tech Challenge".
+    // Și doar când descrierea ÎNCEPE cu numele competiției („CUPA MONDIALA
+    // BAKU…", antetul unei transmisii). Pomenită în treacăt e o emisiune despre
+    // altceva: „two-time Olympic snowboarder", „behind the scenes … during the
+    // UCI Downhill World Cup" (Fuel TV, 1 oct 2026). Pe toată grila: 1 antet
+    // real, 2 mențiuni în treacăt.
     score = 0.55;
     reasons.push(`major competition mentioned in description: "${majorInDesc[0]}"`);
   }

@@ -70,8 +70,17 @@ const STUDIO = {
   stop: '2026-07-10T18:50:00Z',
 };
 
-test('competition only in description on a Sport channel is tier 2', () => {
-  assert.equal(assessImportance(STUDIO, { category: 'Sport' }).tier, 2);
+test('a description that OPENS with the competition name on a Sport channel is tier 2', () => {
+  const swim = { title: 'Inot', description: 'CUPA MONDIALA BAKU, AZERBAIDJAN\\r\\nComentator: Vlad Bucurescu\\r\\nTransmisiune directa.', start: '2026-10-01T14:00:00Z', stop: '2026-10-01T15:35:00Z' };
+  assert.equal(assessImportance(swim, { category: 'Sport' }).tier, 2);
+});
+
+test('a competition mentioned in passing is not an event, even on a Sport channel', () => {
+  assert.equal(assessImportance(STUDIO, { category: 'Sport' }).tier, 0);
+  const danny = { title: 'The Adventures of Danny & The Dingo', description: 'A fun-loving, two-time Olympic snowboarder, his eccentric best friend, and their wild entourage travel the world.', start: '2026-10-01T12:00:00Z', stop: '2026-10-01T12:30:00Z' };
+  const norco = { title: 'Just Getting Started', description: 'Behind the scenes of the Norco Race Division during the UCI Downhill World Cup in Fort William, Scotland.', start: '2026-10-01T14:30:00Z', stop: '2026-10-01T15:00:00Z' };
+  assert.equal(assessImportance(danny, { category: 'Sport' }).tier, 0);
+  assert.equal(assessImportance(norco, { category: 'Sport' }).tier, 0);
 });
 
 test('competition only in description on a generalist channel is NOT important', () => {

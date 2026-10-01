@@ -10,6 +10,9 @@ import { localFromUtc } from './time.mjs';
 const REPLAY_TITLE_RE = /\b(reluare|reluarea|redifuzare|replay|inregistrare)\b|\(r\)/;
 const LIVE_TITLE_RE = /\blive\b|\bin direct\b|\bdirect\b/;
 const LIVE_DESC_RE = /\btransmisiune (in )?direct[a]?\b|\bin direct\b/;
+// În descriere, „reluare" contează doar ca marcaj între paranteze („(Reluare)."
+// la TVR); în text curgător poate însemna orice.
+const REPLAY_DESC_RE = /\(\s*(reluare|redifuzare)\s*\)/;
 const SEASON_RE = /\b20\d\d\s?[/-]\s?(20)?\d\d\b/;        // „2025/26", „2025-2026": sezon, nu dată
 const FULL_DATE_RE = /\b(\d{1,2})[./](\d{1,2})[./]((?:19|20)\d\d)\b/;
 const YEAR_RE = /\b((?:19|20)\d\d)\b/g;
@@ -48,7 +51,9 @@ export function firstAiringIndex(source) {
  */
 export function liveStatus(program, index = null) {
   const titleN = normalize(program?.title || '');
-  const descN = normalize(program?.description || '');
+  // Sursa scrie uneori „\\r\\n" ca text; lipit de cuvântul următor strica
+  // limita de cuvânt („\\nTransmisiune directa" nu mai era recunoscut).
+  const descN = normalize((program?.description || '').replace(/\\[rn]/g, ' '));
   const startMs = new Date(program.start).getTime();
 
   const replayWord = titleN.match(REPLAY_TITLE_RE);
@@ -66,6 +71,9 @@ export function liveStatus(program, index = null) {
       }
     }
   }
+
+  const replayDesc = descN.match(REPLAY_DESC_RE);
+  if (replayDesc) return { status: 'replay', evidence: `descrierea spune „${replayDesc[0]}"` };
 
   if (LIVE_TITLE_RE.test(titleN)) return { status: 'live', evidence: 'titlul spune „live"/„direct"' };
   const liveDesc = descN.match(LIVE_DESC_RE);
