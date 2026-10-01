@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
-import { shapeProgram, resolveTimeRef, programOverlaps } from '../lib/time.mjs';
+import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits } from '../lib/time.mjs';
 import { resolveMood } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { findStreamingFor } from '../lib/xref.mjs';
@@ -37,7 +37,18 @@ export const ExplainInput = {
 };
 
 
-function findProgram(epg, title, channel, startUtc) {
+// Cu o fereastră cerută și fără start_utc, se explică difuzarea DIN fereastră
+// (aceeași pe care o întoarce tv_recommend_by_mood), nu prima din EPG:
+// „FBI" are episoade la 19:10 și la 20:05, iar „diseară" înseamnă al doilea.
+function findProgram(epg, title, channel, startUtc, window = null, now = new Date()) {
+  if (window && !startUtc) {
+    const inWindow = findProgramWhere(epg, title, channel, null, (p) => programOverlaps(p, window) && windowAdmits(p, window, now));
+    if (inWindow) return inWindow;
+  }
+  return findProgramWhere(epg, title, channel, startUtc, () => true);
+}
+
+function findProgramWhere(epg, title, channel, startUtc, accept) {
   for (const ch of epg.channels) {
     if (channel) {
       const q = normalize(channel);
@@ -49,6 +60,7 @@ function findProgram(epg, title, channel, startUtc) {
     for (const p of (ch.programs || [])) {
       if (!matchesQuery(p.title, title)) continue;
       if (startUtc && new Date(p.start).toISOString() !== new Date(startUtc).toISOString()) continue;
+      if (!accept(p)) continue;
       return { ch, program: p };
     }
   }
@@ -63,7 +75,8 @@ export async function handleExplain(args) {
   const ctx = args.context || {};
   const mood = resolveMood(ctx.mood);
 
-  const hit = findProgram(epg, args.title, args.channel, args.start_utc);
+  const window = ctx.timeframe ? resolveTimeRef(ctx.timeframe, now) : null;
+  const hit = findProgram(epg, args.title, args.channel, args.start_utc, window, now);
   if (!hit) {
     return {
       payload: {
@@ -88,7 +101,6 @@ export async function handleExplain(args) {
   // Aceleași componente și același profil ca tv_compare_options / tv_recommend_by_mood.
   // Cu context.timeframe, proximitatea și startul târziu se măsoară față de
   // fereastra cerută — exact ca în tv_recommend_by_mood pentru același timeframe.
-  const window = ctx.timeframe ? resolveTimeRef(ctx.timeframe, now) : null;
   const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer, now, xref, window });
   const mf = { score: c.mood_fit, parts: c.moodParts };
   const channelCat = c.channel_cat;
