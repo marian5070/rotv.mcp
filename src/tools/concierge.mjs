@@ -71,7 +71,9 @@ export const ConciergeInput = {
   max_alternatives: z.number().int().min(0).max(5).default(3),
   risk_aversion: z.enum(['low', 'high']).default('low').describe('low = 3 alternatives, high = none'),
   allow_pauses: z.boolean().default(true),
-  min_rating: z.number().min(0).max(10).default(0),
+  min_rating: z.number().min(0).max(10).default(0).describe(
+    'Hard minimum rating (0-10). When > 0, only titles with a MEASURED rating at or above it are eligible: streaming catalog rating, or the IMDb rating the TV guide declares. TV programmes without any rating (most sport, news, shows) are excluded, not waved through.'
+  ),
   prefer: z.array(z.string()).optional(),
 };
 
@@ -557,6 +559,18 @@ export async function handleConcierge(args) {
     streamList = buildStreamingCandidates(window.duration_min, mood, args.min_rating || 0);
   }
 
+  // min_rating e un minim absolut: fără notă măsurată, un program TV nu poate
+  // dovedi că îl atinge (până la 1 oct 2026 programele fără notă treceau).
+  let unratedTvExcluded = 0;
+  if ((args.min_rating || 0) > 0) {
+    const before = tvList.length;
+    tvList = tvList.filter((c) => {
+      const r = c.shaped?.program?.imdb_rating ?? c._xref?.vote_average;
+      return Number.isFinite(r) && r >= args.min_rating;
+    });
+    unratedTvExcluded = before - tvList.length;
+  }
+
   const allCands = [...tvList, ...streamList];
   const candidatesEvaluated = tvEvaluated + streamList.length;
 
@@ -699,6 +713,9 @@ export async function handleConcierge(args) {
   // Răspuns pereche: când s-au cerut și TV, și streaming, spunem explicit care e
   // cel mai bun din fiecare. Catalogul e mereu disponibil, deci în mod mixt
   // primarul variază puțin cu ora; perechea arată și ce e ACUM la TV.
+  if (unratedTvExcluded > 0) {
+    reasoning.push(`min_rating ${args.min_rating}: ${unratedTvExcluded} programe TV excluse — fără notă măsurată sau sub prag.`);
+  }
   const bestBySource = buildBestBySource(candsAfterDedup, primary);
   if (bestBySource) reasoning.push(bestBySource.note);
   const longWindowHint = longWindowPlanHint(primary, window.duration_min);

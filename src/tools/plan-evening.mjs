@@ -68,6 +68,14 @@ function scoreItem(item, mood, extraPrefer) {
 // Scor descrescător; la egalitate câștigă programul cu durata cea mai
 // APROPIATĂ de bugetul rămas. (Până la 1 oct 2026 semnul era inversat și la
 // egalitate câștiga cel mai scurt → planuri de 90 din 240 min.)
+// Câte minute dintr-un program cad în fereastra cerută. EPG-ul încheie la
+// „:59", de aici rotunjirea.
+export function inWindowMin(p, startUtc, endUtc) {
+  const s = Math.max(new Date(p.start_utc).getTime(), startUtc.getTime());
+  const e = Math.min(new Date(p.stop_utc).getTime(), endUtc.getTime());
+  return Math.max(0, Math.round((e - s) / 60_000));
+}
+
 // Suma pauzelor cronologice: de la ora cerută la primul segment și între
 // segmente consecutive. Niciodată negativă.
 export function chronologicalGapMin(plan, startUtc) {
@@ -170,7 +178,9 @@ export async function handlePlanEvening(args) {
       if (!pick) break;
       plan.push(makeSegment(plan.length + 1, pick, mood));
       cursor = new Date(pick.program.stop_utc).getTime();
-      remaining -= pick.program.duration_min;
+      // Din buget se scade doar partea care cade în fereastră: un program
+      // început înainte de ora cerută nu mai are toată durata de văzut.
+      remaining -= inWindowMin(pick.program, startUtc, endUtc);
       lastChannel = pick.channel_id;
     }
   }
@@ -200,7 +210,10 @@ export async function handlePlanEvening(args) {
       }));
   }
 
-  const totalFilled = plan.reduce((s, p) => s + p.duration_min, 0);
+  // Minute efectiv de văzut în fereastră, nu durata integrală a programelor
+  // (Amurg 20:30–22:59 cerut de la 20:45 = 135 min, nu 150).
+  for (const seg of plan) seg.in_window_min = inWindowMin(seg, startUtc, endUtc);
+  const totalFilled = plan.reduce((s, p) => s + p.in_window_min, 0);
   const gaps = chronologicalGapMin(plan, startUtc);
   const switches = plan.length > 1 ? new Set(plan.map((p) => p.channel_id)).size - 1 : 0;
   const fresh = freshnessEmbed(now);

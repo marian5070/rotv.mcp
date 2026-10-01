@@ -57,3 +57,19 @@ test('compare: a streaming-only title is found, and says where', async () => {
   const oc = c.options[1];
   assert.equal(oc.found, true); assert.equal(oc.tv_found, true); assert.equal(oc.streaming_found, false);
 });
+
+test('couple: an impossible strict threshold relaxes in declared steps', async () => {
+  const { handleFindForCouple } = await import('../src/tools/find-for-couple.mjs');
+  const r = (await handleFindForCouple({ person_a: { mood: 'romantic' }, person_b: { mood: 'captivant' }, fairness: 'strict', min_score: 99, timeframe: 'today', limit: 5, include_streaming_xref: false })).payload;
+  assert.equal(r.requested_fairness, 'strict');
+  assert.equal(r.requested_min_score, 99);
+  assert.equal(r.degraded, true);
+  assert.equal(r.threshold_relaxed, true);
+  assert.equal(r.min_score, 49.5);
+});
+
+test('compare: a tie is called a tie', async () => {
+  const c = (await handleCompareOptions({ options: ['Occident', 'Occident'], upcoming_window_hours: 48 })).payload;
+  assert.match(c.winner.reason, /scor egal cu/);
+  assert.doesNotMatch(c.winner.reason, /cu 0 puncte/);
+});

@@ -209,13 +209,16 @@ export async function handleCompareOptions(args) {
 }
 
 function buildWinnerReason(top, runnerUp, mood) {
-  const parts = [`Cel mai mare scor total (${Math.round(top.total_score * 100) / 100})`];
+  const tied = runnerUp && Math.round((top.total_score - runnerUp.total_score) * 100) / 100 <= 0;
+  const parts = [`${tied ? 'Scor total' : 'Cel mai mare scor total'} (${Math.round(top.total_score * 100) / 100})`];
   if (top.next_airing) parts.push(`disponibil pe ${top.next_airing.channel_name} la ${top.next_airing.start_local.slice(11, 16)}`);
   if (top.streaming) parts.push(`și pe ${top.streaming.provider_name}`);
   parts.push(`pentru mood ${mood.label_ro}`);
   if (runnerUp) {
     const delta = Math.round((top.total_score - runnerUp.total_score) * 100) / 100;
-    parts.push(`bate "${runnerUp.query}" cu ${delta} puncte`);
+    parts.push(delta > 0
+      ? `bate "${runnerUp.query}" cu ${delta} puncte`
+      : `scor egal cu "${runnerUp.query}" — ales prin departajare, nu prin scor`);
   }
   return parts.join(' • ');
 }

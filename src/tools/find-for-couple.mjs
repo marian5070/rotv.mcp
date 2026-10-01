@@ -19,6 +19,9 @@ export const FindForCoupleOutput = {
   person_b: Loose,
   fairness: z.string(),
   min_score: z.number(),
+  requested_fairness: z.string().optional(),
+  requested_min_score: z.number().optional(),
+  threshold_relaxed: z.boolean().optional(),
   degraded: z.boolean(),
   count: z.number(),
   items: z.array(Loose),
@@ -99,9 +102,18 @@ export async function handleFindForCouple(args) {
   let minScore = args.min_score;
   let picks = filterAndRank(items, fairness, minScore, args.limit);
 
+  // Relaxarea se face în trepte și se declară. Întâi doar metoda (strict →
+  // medie) la ACELAȘI prag cerut; pragul se înjumătățește abia dacă nici așa
+  // nu iese nimic, iar răspunsul spune ce s-a cerut și ce s-a aplicat.
+  let thresholdRelaxed = false;
   if (picks.length === 0 && fairness === 'strict') {
     degraded = true;
     fairness = 'average';
+    picks = filterAndRank(items, fairness, minScore, args.limit);
+  }
+  if (picks.length === 0 && args.min_score > 0) {
+    degraded = true;
+    thresholdRelaxed = true;
     minScore = args.min_score * 0.5;
     picks = filterAndRank(items, fairness, minScore, args.limit);
   }
@@ -127,6 +139,9 @@ export async function handleFindForCouple(args) {
       person_b: { ...args.person_b, mood_resolved: resolveMood(args.person_b.mood).key },
       fairness,
       min_score: minScore,
+      requested_fairness: args.fairness,
+      requested_min_score: args.min_score,
+      threshold_relaxed: thresholdRelaxed,
       degraded,
       count: shapedPicks.length,
       items: shapedPicks,
@@ -177,7 +192,7 @@ export const findForCoupleTool = {
   config: {
     title: 'Find content for a couple',
     description:
-      'Finds TV programs that satisfy two people with different moods/preferences. Default fairness=strict (min(scoreA,scoreB) >= threshold — no veto). Auto-falls-back to fairness=average if strict returns empty, marked with degraded:true. Returns per-person score breakdown + compromise note when one side wins by >1.5 points.',
+      'Finds TV programs that satisfy two people with different moods/preferences. Default fairness=strict (min(scoreA,scoreB) >= threshold — no veto). If strict returns nothing it falls back in two declared steps: first fairness=average at the SAME min_score; only if that is still empty is min_score halved. The response always carries requested_fairness, requested_min_score, the effective fairness / min_score, threshold_relaxed and degraded — tell the user when their threshold was relaxed. Returns per-person score breakdown + compromise note when one side wins by >1.5 points.',
     inputSchema: FindForCoupleInput,
     outputSchema: FindForCoupleOutput,
   },

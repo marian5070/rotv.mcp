@@ -288,3 +288,15 @@ test('category medians need at least 30 rated titles', () => {
   assert.equal(m.Film, 7);
   assert.equal('Serial' in m, false);
 });
+
+// ── Runda a 5-a (1 oct seara) ────────────────────────────────────────────────
+import { inWindowMin } from '../src/tools/plan-evening.mjs';
+
+test('plan_evening counts only the minutes that fall inside the window', () => {
+  const start = new Date('2026-10-01T17:45:00Z'); const end = new Date('2026-10-01T20:45:00Z');
+  // Amurg 20:30–22:59 ora României, cerut de la 20:45: 135 min, nu 150
+  assert.equal(inWindowMin({ start_utc: '2026-10-01T17:30:00Z', stop_utc: '2026-10-01T19:59:59Z' }, start, end), 135);
+  assert.equal(inWindowMin({ start_utc: '2026-10-01T18:00:00Z', stop_utc: '2026-10-01T19:00:00Z' }, start, end), 60);
+  assert.equal(inWindowMin({ start_utc: '2026-10-01T20:00:00Z', stop_utc: '2026-10-01T22:00:00Z' }, start, end), 45, 'clipped at the window end');
+  assert.equal(inWindowMin({ start_utc: '2026-10-01T21:00:00Z', stop_utc: '2026-10-01T22:00:00Z' }, start, end), 0);
+});
