@@ -150,3 +150,19 @@ test('country pair combined with named competition in description still boosts',
   const r = assessImportance({ title: 'Spania - Belgia', description: 'optimile Cupei Mondiale FIFA' });
   assert.ok(r.score >= 0.75);
 });
+
+test('a film on a film channel is never an event, whatever its title says', () => {
+  const film = { title: 'Misiune Finala', description: 'Un agent primește o ultimă misiune.', start: '2026-10-01T23:25:00Z', stop: '2026-10-02T01:15:00Z' };
+  assert.deepEqual(assessImportance(film, { category: 'Filme & Seriale' }), { score: 0, tier: 0, reasons: [] });
+  assert.deepEqual(assessImportance({ title: 'Campionatul Mondial al dinozaurilor' }, { category: 'Copii' }), { score: 0, tier: 0, reasons: [] });
+  assert.equal(assessImportance({ title: 'Finala Cupei Mondiale', start: '2026-07-19T19:00:00Z', stop: '2026-07-19T21:30:00Z' }, { category: 'Generaliste' }).tier, 1);
+  assert.equal(assessImportance({ title: 'Finala Cupei Mondiale', start: '2026-07-19T19:00:00Z', stop: '2026-07-19T21:30:00Z' }, { category: 'Sport' }).tier, 1);
+});
+
+test('"sferturi de finală" of a minor tournament is not a final', () => {
+  const q = { title: 'Snooker: Openul Shenzhen - Sferturi de finală', start: '2026-10-01T05:00:00Z', stop: '2026-10-01T08:00:00Z' };
+  assert.equal(assessImportance(q, { category: 'Sport' }).tier, 0);
+  assert.equal(assessImportance({ ...q, title: 'Optimile de finală: Cupa Ligii' }, { category: 'Sport' }).tier, 0);
+  assert.equal(assessImportance({ ...q, title: 'Finala Cupei Romaniei' }, { category: 'Sport' }).tier, 1);
+  assert.equal(assessImportance({ ...q, title: 'Tenis: Roland Garros - sferturi de finala' }, { category: 'Sport' }).tier, 1);
+});

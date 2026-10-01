@@ -7,8 +7,10 @@ import { normalize } from './text.mjs';
 import { programDurationMin } from './time.mjs';
 
 // Major competitions (tier 1 when the broadcast is the event itself).
+// „finala" singură = finală; „sferturi/optimi de finală" NU e o finală (un sfert
+// la un turneu minor primea importanță maximă din acest cuvânt).
 const MAJOR_RE =
-  /\b(world cup|cupa mondiala|campionat(ul)? mondial|fifa|euro 20\d\d|campionat(ul)? european|uefa euro|liga campionilor|champions league|europa league|jocuri(le)? olimpice|olympic|finala|grand slam|roland garros|wimbledon|us open|australian open)\b/;
+  /\b(world cup|cupa mondiala|campionat(ul)? mondial|fifa|euro 20\d\d|campionat(ul)? european|uefa euro|liga campionilor|champions league|europa league|jocuri(le)? olimpice|olympic|(?<!(?:sferturi(?:le)?|optimi(?:le)?|saisprezecimi(?:le)?) de )finala|grand slam|roland garros|wimbledon|us open|australian open)\b/;
 
 // Description-only variant: named competitions only — no bare stage words.
 const MAJOR_DESC_RE =
@@ -50,11 +52,18 @@ const cap = (v) => Math.min(1, Math.round(v * 100) / 100);
  *   tier 1 = major event (World Cup / Euro / CL / final...), tier 2 = notable,
  *   tier 0 = no importance signal. reasons quote the matched text.
  */
+const NON_EVENT_CHANNEL_CATS = new Set(['Filme & Seriale', 'Documentare', 'Copii']);
+
 export function assessImportance(program, channel = {}) {
   const title = program?.title ?? '';
   const description = program?.description ?? '';
   const titleN = normalize(title);
   const allN = normalize(`${title} ${description}`);
+
+  // Canalele de film, documentare și copii nu transmit evenimente: un titlu ca
+  // „Misiune Finala" (film, FilmCafe) nu e o finală. Fără această gardă lua
+  // tier 1 din cuvântul „finala" și, în tv_concierge, bătea orice alt program.
+  if (NON_EVENT_CHANNEL_CATS.has(channel?.category)) return { score: 0, tier: 0, reasons: [] };
 
   let score = 0;
   const reasons = [];
