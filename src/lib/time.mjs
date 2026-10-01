@@ -129,6 +129,53 @@ export function resolveTimeRef(refRaw, now = new Date()) {
   return { from: now, to: new Date(now.getTime() + 30 * 60_000), label: 'now (fallback)' };
 }
 
+// Admiterea în fereastră pentru uneltele de recomandare. programOverlaps
+// acceptă ORICE suprapunere, deci o cerere 20:00–24:00 primea „La bloc" început
+// la 18:15 și, la cereri târzii, programe deja terminate. Reguli (filtru, nu
+// scor — scorurile rămân reproductibile în explain/compare):
+//  - 'now'/'instant' sunt orizonturi de „ce e acum": neschimbat;
+//  - începutul efectiv = max(începutul ferestrei, acum) cât fereastra e în curs;
+//  - respins dacă s-a terminat deja sau dacă partea pierdută depășește
+//    max(10 min, 25% din durată);
+//  - doar pentru intervale explicite ('range'), unde sfârșitul e o constrângere
+//    a utilizatorului: respins dacă mai puțin de jumătate încape în fereastră.
+//    Sfârșitul de 23:59 al lui 'tonight'/'today' e un artefact, nu o constrângere.
+export function effectiveWindowStart({ from, to }, now = new Date()) {
+  const n = now.getTime();
+  return n > from.getTime() && n < to.getTime() ? n : from.getTime();
+}
+
+export function windowAdmits(program, window, now = new Date()) {
+  const label = String(window.label || '');
+  if (/^(now|instant)/.test(label)) return true;
+  const ps = new Date(program.start).getTime();
+  const pe = new Date(program.stop).getTime();
+  const wf = effectiveWindowStart(window, now);
+  const wt = window.to.getTime();
+  if (pe <= wf) return false;
+  const durMin = Math.max(1, (pe - ps) / 60_000);
+  const missedMin = Math.max(0, wf - ps) / 60_000;
+  if (missedMin > Math.max(10, 0.25 * durMin)) return false;
+  if (label === 'range') {
+    const usableMin = (Math.min(pe, wt) - Math.max(ps, wf)) / 60_000;
+    const windowMin = Math.max(1, (wt - wf) / 60_000);
+    if (usableMin < 0.5 * Math.min(durMin, windowMin)) return false;
+  }
+  return true;
+}
+
+// Departajare la scor EGAL în ferestre de seară (≤ 6 h): programele care încep
+// în a doua jumătate a ferestrei rămase vin după cele din prima jumătate.
+// Întoarce 0/1; ordinea existentă se păstrează în interiorul fiecărei grupe.
+export function lateStartBucket(startUtc, window, now = new Date()) {
+  const label = String(window.label || '');
+  if (/^(now|instant)/.test(label)) return 0;
+  const wf = effectiveWindowStart(window, now);
+  const wt = window.to.getTime();
+  if (wt - wf > 6 * 3600_000) return 0;
+  return new Date(startUtc).getTime() > wf + (wt - wf) / 2 ? 1 : 0;
+}
+
 export function programOverlaps(program, { from, to }) {
   const ps = new Date(program.start).getTime();
   const pe = new Date(program.stop).getTime();

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
-import { shapeProgram, resolveTimeRef, programOverlaps } from '../lib/time.mjs';
+import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits, lateStartBucket } from '../lib/time.mjs';
 import { resolveMood, moodFit } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { findStreamingFor } from '../lib/xref.mjs';
@@ -61,14 +61,14 @@ function scoreForPerson(item, person, genres) {
   return { score: Math.round(score * 100) / 100, mood: mood.key, mood_label: mood.label_ro, parts: mf.parts };
 }
 
-function collectAndScore(epg, window, personA, personB, streaming, includeXref) {
+function collectAndScore(epg, window, personA, personB, streaming, includeXref, now = new Date()) {
   const items = [];
   let evaluated = 0;
   let crossUsed = false;
   let fallback = false;
   for (const ch of epg.channels) {
     for (const p of (ch.programs || [])) {
-      if (!programOverlaps(p, window)) continue;
+      if (!programOverlaps(p, window) || !windowAdmits(p, window, now)) continue;
       evaluated++;
       const item = shapeProgram(ch, p);
       const genres = extractGenres(p.title, p.description, p);
@@ -80,7 +80,7 @@ function collectAndScore(epg, window, personA, personB, streaming, includeXref) 
         xref = findStreamingFor(item.program.title, streaming);
         if (xref) crossUsed = true;
       }
-      items.push({ item, a, b, genres, xref });
+      items.push({ item, a, b, genres, xref, late: lateStartBucket(item.program.start_utc, window, now) });
     }
   }
   return { items, evaluated, crossUsed, fallback };
@@ -90,10 +90,10 @@ export async function handleFindForCouple(args) {
   const epg = getEpgFull();
   if (!epg) throw new Error('EPG data not loaded');
   const streaming = args.include_streaming_xref ? getStreaming() : null;
-  const window = resolveTimeRef(args.timeframe || 'tonight');
   const now = new Date();
+  const window = resolveTimeRef(args.timeframe || 'tonight', now);
 
-  const { items, evaluated, crossUsed, fallback } = collectAndScore(epg, window, args.person_a, args.person_b, streaming, args.include_streaming_xref);
+  const { items, evaluated, crossUsed, fallback } = collectAndScore(epg, window, args.person_a, args.person_b, streaming, args.include_streaming_xref, now);
 
   let degraded = false;
   let fairness = args.fairness;
@@ -153,7 +153,7 @@ function filterAndRank(items, fairness, minScore, limit) {
   }).filter((x) => x.combined >= minScore);
 
   const uniqueMap = new Map();
-  for (const s of scored.sort((a, b) => b.combined - a.combined)) {
+  for (const s of scored.sort((a, b) => (b.combined - a.combined) || ((a.late ?? 0) - (b.late ?? 0)))) {
     const key = normalize(s.item.program.title);
     if (!uniqueMap.has(key)) uniqueMap.set(key, s);
   }

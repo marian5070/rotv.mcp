@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { getEpgFull } from '../data/store.mjs';
-import { shapeProgram, resolveTimeRef, programOverlaps } from '../lib/time.mjs';
+import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits, lateStartBucket } from '../lib/time.mjs';
 import { scoreShaped, buildWhy, dedupByTitle } from '../lib/rank.mjs';
 import { ShapedProgram, WindowUtc } from '../lib/output-shapes.mjs';
 
@@ -35,14 +35,14 @@ export async function handleRecommend(args) {
   const epg = getEpgFull();
   if (!epg) throw new Error('EPG data not loaded');
 
-  const window = resolveTimeRef(args.timeframe || 'tonight');
   const now = new Date();
+  const window = resolveTimeRef(args.timeframe || 'tonight', now);
 
   const shaped = [];
   for (const ch of epg.channels) {
     if (args.exclude_news && ch.category === 'Știri') continue;
     for (const p of (ch.programs || [])) {
-      if (!programOverlaps(p, window)) continue;
+      if (!programOverlaps(p, window) || !windowAdmits(p, window, now)) continue;
       const titleLower = (p.title || '').toLowerCase();
       if (args.exclude_news && (titleLower.includes('știri') || titleLower.includes('stiri'))) continue;
       const item = shapeProgram(ch, p);
@@ -54,7 +54,8 @@ export async function handleRecommend(args) {
   }
 
   const deduped = dedupByTitle(shaped);
-  deduped.sort((a, b) => (b._score ?? 0) - (a._score ?? 0));
+  deduped.sort((a, b) => ((b._score ?? 0) - (a._score ?? 0))
+    || (lateStartBucket(a.program.start_utc, window, now) - lateStartBucket(b.program.start_utc, window, now)));
   const top = deduped.slice(0, args.limit).map((it) => {
     const { _score, ...rest } = it;
     return { ...rest, score: Math.round(_score * 100) / 100, why_recommended: buildWhy(it) };

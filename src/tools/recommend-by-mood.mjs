@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
-import { shapeProgram, resolveTimeRef, programOverlaps } from '../lib/time.mjs';
+import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits, lateStartBucket } from '../lib/time.mjs';
 import { resolveMood, moodFit } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { findStreamingFor } from '../lib/xref.mjs';
@@ -50,9 +50,9 @@ export async function handleRecommendByMood(args) {
   const epg = getEpgFull();
   if (!epg) throw new Error('EPG data not loaded');
   const streaming = args.include_streaming_xref ? getStreaming() : null;
-  const window = resolveTimeRef(args.timeframe || 'tonight');
-  const mood = resolveMood(args.mood);
   const now = new Date();
+  const window = resolveTimeRef(args.timeframe || 'tonight', now);
+  const mood = resolveMood(args.mood);
 
   const dislikeGenres = (args.dislike_genres || []).map(normalize);
   const dislikeKeywords = (args.dislike_keywords || []).map(normalize);
@@ -66,7 +66,7 @@ export async function handleRecommendByMood(args) {
   for (const ch of epg.channels) {
     if (mood.excl_channel_cats.includes(ch.channel_category) || mood.excl_channel_cats.includes(ch.category)) continue;
     for (const p of (ch.programs || [])) {
-      if (!programOverlaps(p, window)) continue;
+      if (!programOverlaps(p, window) || !windowAdmits(p, window, now)) continue;
       evaluated++;
       const item = shapeProgram(ch, p);
       const titleLower = normalize(item.program.title);
@@ -107,7 +107,8 @@ export async function handleRecommendByMood(args) {
   }
 
   const deduped = dedupByTitle(candidates);
-  deduped.sort((a, b) => (b._score ?? 0) - (a._score ?? 0));
+  deduped.sort((a, b) => ((b._score ?? 0) - (a._score ?? 0))
+    || (lateStartBucket(a.program.start_utc, window, now) - lateStartBucket(b.program.start_utc, window, now)));
 
   const top = deduped.slice(0, args.limit).map((it) => {
     const { _score, _moodParts, _extractedGenres, _xref, ...rest } = it;
