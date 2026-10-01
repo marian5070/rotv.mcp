@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps, utcFromLocalParts } from '../lib/time.mjs';
-import { resolveMood } from '../lib/moods.mjs';
+import { resolveMood, moodLabel } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { normalize } from '../lib/text.mjs';
@@ -68,6 +68,28 @@ function scoreItem(item, mood, extraPrefer) {
 // Scor descrescător; la egalitate câștigă programul cu durata cea mai
 // APROPIATĂ de bugetul rămas. (Până la 1 oct 2026 semnul era inversat și la
 // egalitate câștiga cel mai scurt → planuri de 90 din 240 min.)
+// Suma pauzelor cronologice: de la ora cerută la primul segment și între
+// segmente consecutive. Niciodată negativă.
+export function chronologicalGapMin(plan, startUtc) {
+  let cursor = startUtc.getTime();
+  let gap = 0;
+  for (const seg of plan) {
+    const s = new Date(seg.start_utc).getTime();
+    if (s > cursor) gap += (s - cursor) / 60_000;
+    cursor = Math.max(cursor, new Date(seg.stop_utc).getTime());
+  }
+  return Math.round(gap);
+}
+
+// Invariantul unui plan secvențial: niciun segment nu începe înaintea
+// sfârșitului celui dinainte.
+export function hasOverlap(plan) {
+  for (let i = 1; i < plan.length; i++) {
+    if (new Date(plan[i].start_utc).getTime() < new Date(plan[i - 1].stop_utc).getTime()) return true;
+  }
+  return false;
+}
+
 export function compareCandidates(a, b, remaining) {
   if (b._score !== a._score) return b._score - a._score;
   return Math.abs(a.program.duration_min - remaining) - Math.abs(b.program.duration_min - remaining);
@@ -132,7 +154,13 @@ export async function handlePlanEvening(args) {
         .filter((c) => {
           const cs = new Date(c.program.start_utc).getTime();
           const dt = (cs - cursorMs) / 60_000;
-          if (dt < -5 || dt > args.max_gap_min) return false;
+          // Primul segment poate fi un program început cu cel mult 5 minute
+          // înainte de ora cerută. Următoarele NU se pot suprapune cu cel
+          // dinainte: încep la sau după sfârșitul lui (până la 1 oct 2026 se
+          // tolerau -5 min și ieșeau planuri imposibile: 23:30–00:54, apoi 00:50).
+          // +1 min la limita de sus: EPG-ul încheie programele la „:59", deci
+          // următorul începe la o secundă după — asta nu e o pauză.
+          if (dt < (plan.length === 0 ? -5 : 0) || dt > args.max_gap_min + 1) return false;
           if (c.program.duration_min > remaining + 20) return false;
           if (!args.allow_channel_switch && lastChannel && c.channel_id !== lastChannel) return false;
           return true;
@@ -173,6 +201,7 @@ export async function handlePlanEvening(args) {
   }
 
   const totalFilled = plan.reduce((s, p) => s + p.duration_min, 0);
+  const gaps = chronologicalGapMin(plan, startUtc);
   const switches = plan.length > 1 ? new Set(plan.map((p) => p.channel_id)).size - 1 : 0;
   const fresh = freshnessEmbed(now);
 
@@ -185,12 +214,15 @@ export async function handlePlanEvening(args) {
       end_utc: endUtc.toISOString(),
       duration_budget_min: args.duration_min,
       mood: mood.key,
-      mood_label_ro: mood.label_ro,
+      mood_label_ro: moodLabel(mood, args.mood),
       plan,
       totals: {
         segments: plan.length,
         total_filled_min: totalFilled,
-        gap_min: Math.max(0, args.duration_min - totalFilled),
+        // gap_min = pauzele REALE: până la primul segment și între segmente.
+        // unfilled_min = cât din buget rămâne neacoperit (ce raporta gap_min înainte).
+        gap_min: gaps,
+        unfilled_min: Math.max(0, args.duration_min - totalFilled),
         switches,
       },
       alternatives,
