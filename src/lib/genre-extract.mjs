@@ -1,21 +1,21 @@
 import { normalize } from './text.mjs';
 
 export const GENRE_ANCHORS = {
-  'Acțiune': ['actiune', 'urmarire', 'explozie', 'agent', 'comando', 'lupta', 'misiune', 'mercenar', 'action', 'fight', 'chase', 'mission', 'gunfight', 'special forces'],
-  'Aventuri': ['aventura', 'aventuri', 'expeditie', 'calatorie', 'descoperire', 'jungla', 'comoara', 'adventure', 'quest', 'expedition', 'voyage', 'treasure', 'journey', 'explorer'],
-  'Dramă': ['drama', 'sentimente', 'tragedie', 'doliu', 'pierdere', 'familie destramata', 'tragedy', 'life story', 'grief', 'loss', 'biopic', 'struggle'],
-  'SF': ['science', 'viitor', 'robot', 'extraterestri', 'planeta', 'galactic', 'intergalactic', 'spatial', 'sci-fi', 'science fiction', 'future', 'alien', 'space', 'cyborg', 'dystopia'],
-  'Thriller': ['thriller', 'suspans', 'conspiratie', 'urmarit', 'amenintare', 'fugar', 'suspense', 'conspiracy', 'manhunt', 'pursuit', 'hostage'],
-  'Comedie': ['comedie', 'comic', 'amuzant', 'hazliu', 'sitcom', 'parodie', 'satira', 'gluma', 'comedy', 'parody', 'satire', 'funny', 'hilarious', 'stand-up'],
+  'Acțiune': ['actiune', 'urmarire', 'explozie', 'agent', 'comando', 'lupta', 'misiune', 'mercenar', 'action', 'fight', 'chase', 'mission', 'gunfight', 'special forces', 'terorist'],
+  'Aventuri': ['aventura', 'aventuri', 'expeditie', 'calatorie', 'descoperire', 'jungla', 'comoara', 'adventure', 'quest', 'expedition', 'voyage', 'treasure', 'journey', 'explorer', 'pirat'],
+  'Dramă': ['drama', 'sentimente', 'tragedie', 'doliu', 'pierdere', 'familie destramata', 'tragedy', 'life story', 'grief', 'loss', 'biopic', 'struggle', 'biografic', 'evenimente reale', 'poveste adevarata'],
+  'SF': ['science', 'viitor', 'robot', 'extraterestr', 'planeta', 'galactic', 'intergalactic', 'spatial', 'sci-fi', 'science fiction', 'future', 'alien', 'space', 'cyborg', 'dystopia'],
+  'Thriller': ['thriller', 'suspans', 'conspiratie', 'urmarit', 'amenintare', 'fugar', 'suspense', 'conspiracy', 'manhunt', 'pursuit', 'hostage', 'ostatic', 'complot', 'santaj', 'razbun'],
+  'Comedie': ['comedie', 'comic', 'amuzant', 'hazliu', 'sitcom', 'parodie', 'satira', 'gluma', 'comedy', 'parody', 'satire', 'funny', 'hilarious', 'stand-up', 'ghinionist'],
   'Fantasy': ['fantezie', 'fantastic', 'vrajitor', 'magie', 'dragon', 'regat', 'mit', 'legenda', 'fantasy', 'magic', 'wizard', 'kingdom', 'myth', 'legend', 'enchanted'],
   'Familie': ['familie', 'copii', 'animatie usoara', 'poveste', 'basm', 'family', 'kids', 'friendly', 'heartwarming', 'all-ages', 'holiday'],
   'Animaţie': ['animatie', 'desen animat', 'animat', 'anime', 'animation', 'animated', 'cartoon', 'cgi', 'pixar', 'dreamworks'],
-  'Crimă': ['crima', 'ucigas', 'detectiv', 'ancheta', 'criminal', 'mafia', 'dosar', 'omor', 'crime', 'killer', 'detective', 'murder', 'heist', 'gangster', 'noir'],
+  'Crimă': ['crima', 'ucigas', 'detectiv', 'ancheta', 'criminal', 'mafia', 'dosar', 'omor', 'crime', 'killer', 'detective', 'murder', 'heist', 'gangster', 'noir', 'omucidere', 'politist', 'politie', 'comisar', 'jaf', 'mafi', 'asasin', 'infractor', 'traficant', 'hoti', 'ucider'],
   'Romantic': ['dragoste', 'indragost', 'romantica', 'iubire', 'cuplu', 'nunta', 'sarut', 'romance', 'romantic', 'love story', 'wedding', 'kiss', 'dating', 'rom-com'],
-  'Horror': ['horror', 'oroare', 'terifiant', 'demonic', 'fantoma', 'supranatural', 'masacru', 'scary', 'terrifying', 'ghost', 'haunted', 'slasher', 'supernatural'],
+  'Horror': ['horror', 'oroare', 'terifiant', 'demonic', 'fantoma', 'supranatural', 'masacru', 'scary', 'terrifying', 'ghost', 'haunted', 'slasher', 'supernatural', 'vampir', 'zombi'],
   'Mister': ['mister', 'misterios', 'enigma', 'disparitie', 'secret', 'neelucidat', 'mystery', 'mysterious', 'disappearance', 'unsolved', 'whodunit'],
   'Muzică': ['muzica', 'concert', 'live', 'recital', 'festival', 'melodie', 'cantec', 'music', 'song', 'musical', 'band'],
-  'Război': ['razboi', 'front', 'soldat', 'batalie', 'militar', 'ostasi', 'ww2', 'wwii', 'holocaust', 'war', 'soldier', 'battle', 'military', 'normandy'],
+  'Război': ['razboi', 'front', 'soldat', 'batalie', 'militar', 'ostasi', 'ww2', 'wwii', 'holocaust', 'war', 'soldier', 'battle', 'military', 'normandy', 'nazist'],
 };
 
 // Potrivire pe cuvânt, nu pe subșir. Până la 1 oct 2026 se folosea includes()
@@ -25,6 +25,11 @@ export const GENRE_ANCHORS = {
 //    românești (misterioasă, războinic, aventurile, muzical);
 //  - STRICT: ancore scurte/ambigue, doar formele listate (cuvânt întreg) —
 //    altfel „frontieră", „bandits", „Warner", „questions", „lived" ar trece.
+// Ancorele românești adăugate la 1 oct 2026 seara au fost măsurate pe grila
+// zilei, una câte una, cu context: au rămas doar cele fără potriviri false.
+// Respinse la măsurătoare: inspector (inspectori de animale), ucis, periculos,
+// anchet / investiga (jurnale de știri), demon (demonstreze), arme (armenii),
+// iubit (iubitor de folclor), salbatic, adolescent, supravietui, monstru.
 const STRICT_FORMS = {
   band: 'bands?',
   front: 'front(?:ul|ului|uri|urile|urilor|line|lines)?',
@@ -37,6 +42,8 @@ const STRICT_FORMS = {
   noir: 'noir',
   alien: 'aliens?',
   loss: 'loss(?:es)?',
+  hoti: 'hoti(?:i|lor)?',
+  jaf: 'jaf(?:ul|ului|uri|urile|urilor)?',
 };
 const escapeRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const B = '(?<![a-z0-9])';

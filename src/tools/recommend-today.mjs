@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getEpgFull } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits, lateStartBucket } from '../lib/time.mjs';
 import { scoreShaped, buildWhy, dedupByTitle } from '../lib/rank.mjs';
+import { tvContentPrior } from '../lib/confidence.mjs';
 import { ShapedProgram, WindowUtc } from '../lib/output-shapes.mjs';
 
 export const RecommendOutput = {
@@ -54,7 +55,12 @@ export async function handleRecommend(args) {
   }
 
   const deduped = dedupByTitle(shaped);
+  // Fără mood, scorul are puține trepte și multe titluri ajung la egalitate.
+  // La egalitate: întâi programele pe care EPG-ul le descrie (film/serial cu
+  // sinopsis), apoi cele care încep în prima parte a ferestrei. Scorul nu se schimbă.
+  const prior = (it) => tvContentPrior(it.program).value;
   deduped.sort((a, b) => ((b._score ?? 0) - (a._score ?? 0))
+    || (prior(b) - prior(a))
     || (lateStartBucket(a.program.start_utc, window, now) - lateStartBucket(b.program.start_utc, window, now)));
   const top = deduped.slice(0, args.limit).map((it) => {
     const { _score, ...rest } = it;

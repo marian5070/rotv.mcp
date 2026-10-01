@@ -30,7 +30,9 @@ test('short ambiguous anchors match only their listed word forms', () => {
   assert.deepEqual(g('pe frontul de est'), ['Război']);
   assert.deepEqual(g('Star Wars'), ['Război']);
   assert.deepEqual(g('x', 'a rock band on tour'), ['Muzică']);
-  assert.deepEqual(g('x', 'bandits and banda de hoți'), []);
+  assert.deepEqual(g('x', 'bandits and banda largă'), []);
+  assert.deepEqual(g('x', 'o bandă de hoți la hotel'), ['Crimă']);
+  assert.deepEqual(g('x', 'un hotel cu jaluzele și armeni demonstrând'), []);
   assert.deepEqual(g('x', 'mitul lui Sisif'), ['Fantasy']);
   assert.deepEqual(g('x', 'Mitch și Mitică la Mittagsmagazin'), []);
 });
