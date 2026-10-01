@@ -167,7 +167,11 @@ function buildStreamingCandidates(windowDurationMin, mood, minRating) {
         duration_min: s.runtime ?? 90,
       },
     };
-    const genres = extractGenres(s.title, s.description, s);
+    // Genurile din catalog sunt metadate reale; extragerea din text e doar
+    // rezerva pentru titlurile fără genuri (la fel ca în tv_compare_options).
+    const genres = s.genres?.length
+      ? s.genres.map((g) => ({ genre: g, confidence: 1, anchors: ['catalog'] }))
+      : extractGenres(s.title, s.description, s);
     const mf = moodFit(fakeShaped, genres, mood);
     s._genres = genres;
     s._moodFit = mf;
@@ -537,7 +541,16 @@ export async function handleConcierge(args) {
   const candidatesEvaluated = tvEvaluated + streamList.length;
 
   const noiseRes = applyNoiseFilter(allCands, exclCats);
+  let moodGateBypassed = false;
   let cands = applyKeywordFilter(noiseRes.keep, args.exclude_keywords);
+  // Când utilizatorul a cerut un mood recunoscut, un gen EXCLUS de acel mood
+  // e o excludere, nu o penalizare pe care un rating mare o poate acoperi
+  // („Punisher" pentru „obosit"). Dacă ar rămâne fără nimic, păstrăm lista.
+  if (args.mood && isKnownMood(args.mood)) {
+    const allowed = cands.filter((c) => !(c._moodFit?.parts || []).some((p) => p.startsWith('gen exclus')));
+    if (allowed.length) cands = allowed;
+    else if (cands.length) moodGateBypassed = true;
+  }
 
   for (const c of cands) {
     const partialAxes = computePartialAxes(c, window.duration_min, window.start_utc);
@@ -659,6 +672,9 @@ export async function handleConcierge(args) {
   // Un mood necunoscut cade pe „oricine": o spunem, nu tăcem.
   if (args.mood && !isKnownMood(args.mood)) {
     reasoning.push(`Mood „${String(args.mood).slice(0, 40)}" nu e recunoscut — am folosit „oricine". Mood-uri disponibile: ${moodKeys().join(', ')}.`);
+  }
+  if (moodGateBypassed) {
+    reasoning.push(`Atenție: tot ce încape în fereastră are un gen pe care mood-ul „${mood.label_ro}" îl exclude — alegerea de mai sus e singura disponibilă, nu una potrivită. Lărgește fereastra sau sursele.`);
   }
   const longWindowHint = longWindowPlanHint(primary, window.duration_min);
   if (longWindowHint) reasoning.push(longWindowHint);

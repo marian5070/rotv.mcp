@@ -38,12 +38,22 @@ export function tvContentPrior(program) {
   return { value: 0.3, note: 'fără rating; EPG nu descrie programul' };
 }
 
+export const MIN_VOTES_FOR_RATING = 50;
+
 export function ratingSignal(candidate) {
   // Rating măsurat: catalogul de streaming, sau — pentru TV — același titlu
   // găsit în catalog (xref), când potrivirea e sigură.
   let va = null;
   let via = '';
-  if (candidate.source === 'streaming') va = candidate.vote_average;
+  if (candidate.source === 'streaming') {
+    // Un rating din câteva voturi nu e o măsurătoare: 7,9 din 9 voturi bătea
+    // filme cu zeci de mii de voturi. Sub prag rămâne neutru și o spune.
+    const votes = candidate.vote_count;
+    if (Number.isFinite(votes) && votes < MIN_VOTES_FOR_RATING) {
+      return { value: 0.5, note: `rating din ${votes} voturi — prea puține ca să conteze (default 0.5)` };
+    }
+    va = candidate.vote_average;
+  }
   else if (Number.isFinite(candidate._xref?.vote_average) && candidate._xref.vote_average > 0) {
     va = candidate._xref.vote_average;
     via = ' (același titlu în catalogul de streaming)';

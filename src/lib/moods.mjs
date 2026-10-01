@@ -20,7 +20,9 @@ export const MOODS = {
     pref_channel_cats: ['Filme & Seriale', 'Generaliste', 'Documentare'],
     pref_genres: ['Comedie', 'Familie', 'Romantic', 'Animaţie', 'Muzică'],
     excl_channel_cats: ['Știri', 'Sport'],
-    excl_genres: ['Horror', 'Thriller', 'Război', 'Mister'],
+    // „Crimă" era deja exclusă prin cuvinte-cheie (excl_keywords: 'crima'), dar
+    // nu și ca gen: un serial polițist cu genul din catalog trecea drept relaxant.
+    excl_genres: ['Horror', 'Thriller', 'Război', 'Mister', 'Crimă'],
     duration_min: 30,
     duration_max: 110,
     pref_keywords: ['comedie', 'comedy', 'sitcom', 'feel-good', 'usor', 'light', 'familie', 'family', 'relax'],

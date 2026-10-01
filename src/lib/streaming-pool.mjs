@@ -26,6 +26,7 @@ export function buildStreamingPool({ minRating = 0, maxDurationMin = null } = {}
           genres: sItem.genres || [],
           runtime,
           vote_average: rating,
+          vote_count: sItem.voteCount ?? sItem.vote_count ?? null,
           description: sItem.overview || sItem.description || '',
         });
       }

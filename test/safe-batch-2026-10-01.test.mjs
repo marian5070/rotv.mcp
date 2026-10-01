@@ -211,3 +211,19 @@ test('an unknown mood is reported as unknown; one-letter strings no longer match
 test('the "longer" alternative has a confidence floor', () => {
   assert.equal(LONGER_ALT_MAX_GAP_PCT, 15);
 });
+
+// ── Rating cu voturi puține ──────────────────────────────────────────────────
+import { MIN_VOTES_FOR_RATING } from '../src/lib/confidence.mjs';
+
+test('a rating built on a handful of votes is not treated as measured', () => {
+  const few = ratingSignal({ source: 'streaming', vote_average: 7.9, vote_count: 9 });
+  assert.equal(few.value, 0.5); assert.match(few.note, /9 voturi/);
+  const near = (v, x) => Math.abs(v - x) < 1e-9;
+  assert.ok(near(ratingSignal({ source: 'streaming', vote_average: 8.2, vote_count: 21456 }).value, 0.64));
+  assert.ok(near(ratingSignal({ source: 'streaming', vote_average: 8.2 }).value, 0.64), 'unknown vote count: unchanged');
+  assert.equal(MIN_VOTES_FOR_RATING, 50);
+});
+
+test('the tired mood excludes crime as a genre, as it already did by keyword', () => {
+  assert.ok(rm('obosit').excl_genres.includes('Crimă'));
+});
