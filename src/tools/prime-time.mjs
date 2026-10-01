@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getEpgFull, getEpgHome } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps } from '../lib/time.mjs';
 import { ProgramInner, WindowUtc } from '../lib/output-shapes.mjs';
+import { isNewsProgram } from '../lib/anti-noise.mjs';
 
 export const PrimeTimeOutput = {
   generated_at: z.string().nullable().optional(),
@@ -81,6 +82,7 @@ export async function handlePrimeTime(args) {
     if (args.exclude_news && ch.category === 'Știri') continue;
     const progs = (ch.programs || [])
       .filter((p) => programOverlaps(p, window))
+      .filter((p) => !(args.exclude_news && isNewsProgram(p)))
       .map((p) => {
         const s = shapeProgram(ch, p);
         return s.program;

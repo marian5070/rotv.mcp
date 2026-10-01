@@ -1,5 +1,11 @@
 import { normalize } from './text.mjs';
 
+// Buletin de știri după eticheta EPG a PROGRAMULUI (diacritice pliate:
+// „Ştiri"/„Știri"). Fără ancore pe titlu — ratează „Focus"/„Telejurnal".
+export function isNewsProgram(program) {
+  return normalize(program?.category || '') === 'stiri';
+}
+
 export const NOISE_CATEGORIES = {
   politica: {
     label: 'Politică / dezbateri',
