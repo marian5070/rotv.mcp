@@ -49,3 +49,15 @@ test('output shape is unchanged: genre, confidence, anchors; top 3', () => {
   assert.ok(r.length <= 3);
   for (const x of r) assert.deepEqual(Object.keys(x), ['genre', 'confidence', 'anchors']);
 });
+
+test('genres declared by the EPG source win over text extraction', async () => {
+  const { sourceGenres } = await import('../src/lib/genre-extract.mjs');
+  const p = { title: 'Un film', description: 'un detectiv și o crimă', genres: ['Acţiune', 'Fantastic', 'Dragoste', 'Western'] };
+  assert.deepEqual(extractGenres(p.title, p.description, p).map((x) => x.genre), ['Acțiune', 'Fantasy', 'Romantic']);
+  assert.deepEqual(extractGenres(p.title, p.description, p)[0].anchors, ['epg']);
+  // doar etichete fără echivalent → se revine la text
+  const w = { title: 'Un film', description: 'un detectiv și o crimă', genres: ['Western'] };
+  assert.deepEqual(extractGenres(w.title, w.description, w).map((x) => x.genre), ['Crimă']);
+  assert.deepEqual(sourceGenres({ program: { genres: ['Comedie'] } }).map((x) => x.genre), ['Comedie']);
+  assert.deepEqual(sourceGenres({}), []);
+});

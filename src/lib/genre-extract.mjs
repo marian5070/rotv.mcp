@@ -63,8 +63,33 @@ const ANCHOR_RX = Object.entries(GENRE_ANCHORS).map(([genre, anchors]) => [
 
 const memoStore = new WeakMap();
 
+// Genurile pe care sursa EPG le declară (câmpul opțional `genres` al
+// programului) sunt metadate, nu deducții: când există, extragerea din text nu
+// mai rulează. Etichetele sursei se traduc în taxonomia mood-urilor; „Istoric"
+// și „Western" nu au echivalent și se ignoră.
+const SOURCE_GENRE_MAP = {
+  'Comedie': 'Comedie', 'Dramă': 'Dramă', 'Animaţie': 'Animaţie', 'Desene animate': 'Animaţie',
+  'Familie': 'Familie', 'Acţiune': 'Acțiune', 'Crimă': 'Crimă', 'Film noir': 'Crimă',
+  'Romantic': 'Romantic', 'Dragoste': 'Romantic', 'Mister': 'Mister', 'Aventuri': 'Aventuri',
+  'Thriller': 'Thriller', 'Fantastic': 'Fantasy', 'SF': 'SF', 'Horror': 'Horror',
+  'Biografic': 'Dramă', 'Muzical': 'Muzică', 'Război': 'Război',
+};
+
+export function sourceGenres(program) {
+  const raw = program?.genres ?? program?.program?.genres;
+  if (!Array.isArray(raw) || !raw.length) return [];
+  const mapped = [...new Set(raw.map((g) => SOURCE_GENRE_MAP[g]).filter(Boolean))];
+  return mapped.map((genre) => ({ genre, confidence: 1, anchors: ['epg'] }));
+}
+
 export function extractGenres(progTitle, progDesc, memoKey) {
   if (memoKey && memoStore.has(memoKey)) return memoStore.get(memoKey);
+
+  const declared = sourceGenres(memoKey);
+  if (declared.length) {
+    memoStore.set(memoKey, declared);
+    return declared;
+  }
 
   const title = normalize(progTitle || '');
   const haystack = `${title} ${normalize(progDesc || '')}`;

@@ -214,6 +214,8 @@ export function shapeProgram(channel, program) {
       duration_min: programDurationMin(program),
       category: program.category,
       description: program.description || '',
+      // Opționale, doar când sursa EPG le declară.
+      ...(program.genres?.length ? { genres: program.genres } : {}),
     },
   };
 }
