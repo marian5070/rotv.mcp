@@ -95,7 +95,7 @@ export const searchProgramTool = {
   config: {
     title: 'Search Romanian TV programs',
     description:
-      'Search programs across all 254 Romanian TV channels by free-text title, channel, category, and time window. Use for queries like "documentaries on Discovery tomorrow", "football on Saturday", "what is on Antena 1 right now". Time references accepted: now, tonight, tomorrow, weekend, primetime, today, YYYY-MM-DD, ISO instant, or ISO range "A/B".',
+      'Search programs across all Romanian TV channels in the guide by free-text title, channel, category, and time window. Use for queries like "documentaries on Discovery tomorrow", "football on Saturday", "what is on Antena 1 right now". Time references accepted: now, tonight, tomorrow, weekend, primetime, today, YYYY-MM-DD, ISO instant, or ISO range "A/B".',
     inputSchema: SearchInput,
     outputSchema: SearchOutput,
   },

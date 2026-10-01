@@ -48,7 +48,7 @@ per-call confirmation. Time references accepted throughout: `now`, `tonight`,
 
 | Tool | What it does |
 |---|---|
-| `tv_now_on_tv` | What's on right now — the 14 main Romanian channels or all ~258 |
+| `tv_now_on_tv` | What's on right now — the 14 main Romanian channels or all channels in the guide |
 | `tv_search_program` | Search the schedule by keywords and timeframe |
 | `tv_get_prime_time` | Tonight's 20:00–23:00 (Europe/Bucharest) lineup, grouped by channel |
 | `tv_recommend_today` | Ranked picks for today (channel quality, timing, preferences) |
@@ -120,7 +120,7 @@ MCP client ── POST /mcp (streamable HTTP, stateless: fresh server per reques
   transport per POST; safe behind any proxy/tunnel.
 - **Data** (read-only, produced by the [rotv-guide](https://github.com/marian5070/rotv-guide)
   pipeline, never modified by this service):
-  - `epg-normalized.json` — ~258 TV channels, −6h to +72h, ISO 8601 UTC
+  - `epg-normalized.json` — all TV channels in the guide (260+; the count is computed, not fixed), −6h to +72h, ISO 8601 UTC
   - `epg-homepage.json` — 15 main channels, −2h to +36h
   - `streaming-full.json` — Netflix / HBO Max / Prime / Disney+ / Apple TV+ catalogs
   - Paths configurable via `ROTV_DATA_DIR`.

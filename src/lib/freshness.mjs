@@ -73,10 +73,11 @@ export function freshnessEmbed(now = new Date()) {
   };
 }
 
-export function summarizeFreshness(fresh) {
+// `only` = 'epg' | 'streaming' restrânge rezumatul la sursa cerută.
+export function summarizeFreshness(fresh, only = null) {
   const parts = [];
-  const a = fresh.sources.epg.age_minutes;
-  const s = fresh.sources.streaming.age_minutes;
+  const a = only === 'streaming' ? null : fresh.sources.epg.age_minutes;
+  const s = only === 'epg' ? null : fresh.sources.streaming.age_minutes;
   if (a !== null) {
     if (a < 60) parts.push(`EPG actualizat acum ${a} min`);
     else parts.push(`EPG actualizat acum ${Math.floor(a / 60)}h${a % 60 ? a % 60 + 'min' : ''}`);
@@ -85,6 +86,7 @@ export function summarizeFreshness(fresh) {
     if (s < 60) parts.push(`streaming acum ${s} min`);
     else parts.push(`streaming acum ${Math.floor(s / 60)}h${s % 60 ? s % 60 + 'min' : ''}`);
   }
-  const tail = fresh.overall_stale ? ' — atenție, date învechite.' : ' — toate proaspete.';
+  const stale = only === 'epg' ? fresh.sources.epg.stale : only === 'streaming' ? fresh.sources.streaming.stale : fresh.overall_stale;
+  const tail = stale ? ' — atenție, date învechite.' : only ? ' — proaspăt.' : ' — toate proaspete.';
   return parts.join(', ') + tail;
 }

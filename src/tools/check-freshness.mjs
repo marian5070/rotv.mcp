@@ -32,7 +32,7 @@ export async function handleCheckFreshness(args) {
       now_utc: now.toISOString(),
       sources,
       overall_stale: fresh.overall_stale,
-      summary: summarizeFreshness(fresh),
+      summary: summarizeFreshness(fresh, args.source === 'epg' || args.source === 'streaming' ? args.source : null),
       freshness: { epg_age_min: fresh.sources.epg.age_minutes, streaming_age_min: fresh.sources.streaming.age_minutes, stale: fresh.overall_stale },
     },
     _quality: {

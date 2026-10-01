@@ -13,7 +13,7 @@ export const NowOnTvOutput = {
 
 export const NowOnTvInput = {
   scope: z.enum(['main', 'all']).default('main').describe(
-    'main = 14 main Romanian channels (PRO TV, Antena 1, Kanal D, TVR 1/2, Digi 24, etc.); all = all 254 channels'
+    'main = 14 main Romanian channels (PRO TV, Antena 1, Kanal D, TVR 1/2, Digi 24, etc.); all = every channel in the guide (the live count is in tv_tonight_card stats.channelsMonitored)'
   ),
   exclude_news: z.boolean().default(false).describe(
     'Drop channels whose category is "Știri" (Romanian news channels)'
