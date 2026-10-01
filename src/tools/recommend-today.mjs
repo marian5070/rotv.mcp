@@ -46,7 +46,7 @@ export async function handleRecommend(args) {
       const titleLower = (p.title || '').toLowerCase();
       if (args.exclude_news && (titleLower.includes('știri') || titleLower.includes('stiri'))) continue;
       const item = shapeProgram(ch, p);
-      const score = scoreShaped(item, { prefer: args.prefer, excludeNews: args.exclude_news, now });
+      const score = scoreShaped(item, { prefer: args.prefer, excludeNews: args.exclude_news, now, window });
       if (score === null) continue;
       item._score = score;
       shaped.push(item);

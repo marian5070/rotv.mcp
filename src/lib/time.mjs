@@ -145,6 +145,18 @@ export function effectiveWindowStart({ from, to }, now = new Date()) {
   return n > from.getTime() && n < to.getTime() ? n : from.getTime();
 }
 
+// Fereastră „de seară": interval mărginit de cel mult 6 h, altul decât
+// 'now'/'instant'. Doar pentru ele are sens ancorarea pe începutul ferestrei
+// și penalizarea startului târziu; pentru 'today'/'tomorrow'/'weekend'/dată,
+// ancora pe miezul nopții ar favoriza programele de la 00:00.
+export function isEveningWindow(window, now = new Date()) {
+  if (!window?.from || !window?.to) return false;
+  if (/^(now|instant)/.test(String(window.label || ''))) return false;
+  if (now.getTime() >= window.to.getTime()) return false; // fereastră deja încheiată: nimic de ancorat
+  const span = window.to.getTime() - effectiveWindowStart(window, now);
+  return span > 0 && span <= 6 * 3600_000;
+}
+
 export function windowAdmits(program, window, now = new Date()) {
   const label = String(window.label || '');
   if (/^(now|instant)/.test(label)) return true;

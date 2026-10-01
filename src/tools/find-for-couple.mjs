@@ -43,15 +43,15 @@ export const FindForCoupleInput = {
 };
 
 
-function scoreForPerson(item, person, genres) {
+function scoreForPerson(item, person, genres, window = null, now = new Date()) {
   const mood = resolveMood(person.mood);
   const extraPrefer = (person.prefer || []).map(resolvePreferLabel);
   const dislikeGenres = (person.dislike_genres || []).map(normalize);
   const dislikeKeywords = (person.dislike_keywords || []).map(normalize);
 
-  const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer });
+  const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer, window, now });
   const mf = { score: c.mood_fit, parts: c.moodParts };
-  let score = sumComponents(c, PROFILE.plan);
+  let score = sumComponents(c, PROFILE.couple);
 
   if (genres.some((g) => dislikeGenres.includes(normalize(g.genre)))) score -= 3;
   const titleLower = normalize(item.program.title);
@@ -72,8 +72,8 @@ function collectAndScore(epg, window, personA, personB, streaming, includeXref, 
       const item = shapeProgram(ch, p);
       const genres = extractGenres(p.title, p.description, p);
       if (genres.length === 0) fallback = true;
-      const a = scoreForPerson(item, personA, genres);
-      const b = scoreForPerson(item, personB, genres);
+      const a = scoreForPerson(item, personA, genres, window, now);
+      const b = scoreForPerson(item, personB, genres, window, now);
       let xref = null;
       if (includeXref && streaming && Math.min(a.score, b.score) >= 0.5) {
         xref = findStreamingFor(item.program.title, streaming);

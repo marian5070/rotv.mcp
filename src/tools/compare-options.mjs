@@ -102,7 +102,7 @@ export async function handleCompareOptions(args) {
       scoreBreakdown = {
         channel_cat: c.channel_cat,
         mood_fit: c.mood_fit,
-        time_proximity: c.time_proximity,
+        time_proximity: c.time_proximity + c.late_start,
         duration_match: c.duration_match,
         prefer_boost: c.prefer_boost,
         xref_boost: c.xref_boost,

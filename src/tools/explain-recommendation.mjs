@@ -86,11 +86,15 @@ export async function handleExplain(args) {
   const crossUsed = !!xref;
 
   // Aceleași componente și același profil ca tv_compare_options / tv_recommend_by_mood.
-  const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer, now, xref });
+  // Cu context.timeframe, proximitatea și startul târziu se măsoară față de
+  // fereastra cerută — exact ca în tv_recommend_by_mood pentru același timeframe.
+  const window = ctx.timeframe ? resolveTimeRef(ctx.timeframe, now) : null;
+  const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer, now, xref, window });
   const mf = { score: c.mood_fit, parts: c.moodParts };
   const channelCat = c.channel_cat;
   const deltaMin = c.deltaMin;
-  const timeProx = c.time_proximity;
+  const timeProx = Math.round((c.time_proximity + c.late_start) * 100) / 100;
+  const proxRef = c.proximityAnchored ? 'de la începutul ferestrei' : 'de acum';
   const durMatch = c.duration_match;
   const prefBoost = c.prefer_boost;
   const xrefBoost = c.xref_boost;
@@ -102,7 +106,14 @@ export async function handleExplain(args) {
   const score_breakdown = {
     channel_cat: { value: channelCat, why: `Categoria '${item.channel_category}' valorează ${channelCat >= 0 ? '+' + channelCat : channelCat}` },
     mood_fit: { value: mf.score, why: mf.parts.length ? `Mood '${mood.label_ro}': ${mf.parts.join('; ')}` : `Mood '${mood.label_ro}' — niciun factor nu se aplică` },
-    time_proximity: { value: timeProx, why: deltaMin >= -5 && deltaMin <= 60 ? `Începe în ${Math.round(deltaMin)} min (fereastră ±60 min)` : `Începe în ${Math.round(deltaMin)} min — în afara ferestrei de proximitate` },
+    time_proximity: {
+      value: timeProx,
+      why: c.late_start < 0
+        ? `Începe la ${Math.round(deltaMin)} min ${proxRef} — start târziu în fereastra cerută (${c.late_start})${c.inProximity ? ', dar în banda de proximitate (+2)' : ''}`
+        : c.inProximity
+          ? `Începe la ${Math.round(deltaMin)} min ${proxRef} (bandă -5…+${Math.round(c.proximityBandMax)} min)`
+          : `Începe la ${Math.round(deltaMin)} min ${proxRef} — în afara benzii de proximitate`,
+    },
     duration_match: { value: durMatch, why: durMatch > 0 ? `${item.program.duration_min} min se încadrează în 45–180` : `${item.program.duration_min} min — în afara band-ului 45–180` },
     prefer_boost: { value: prefBoost, why: prefBoost > 0 ? `Categoria '${item.channel_category}' e în lista prefer` : 'Nicio preferință explicită aplicată' },
     xref_boost: { value: xrefBoost, why: xref ? `Bonus 0.5 — și pe ${xref.provider_name} (${xref.confidence_label} confidence)` : 'Nu apare în catalogul streaming' },

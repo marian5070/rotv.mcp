@@ -68,7 +68,7 @@ export async function handleRecommendByMood(args) {
 
       // Profilul complet, ca în compare/explain; xref se caută doar pentru
       // candidații care trec deja de 1,5 fără el (cost de căutare).
-      const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer, now });
+      const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer, now, window });
       const mf = { score: c.mood_fit, parts: c.moodParts };
       let score = sumComponents(c, PROFILE.full);
 

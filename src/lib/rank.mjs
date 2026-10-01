@@ -1,6 +1,6 @@
 import { assessImportance } from './importance.mjs';
 import { normalize } from './text.mjs';
-import { CHANNEL_SCORE as CHANNEL_CAT_SCORE, timeProximity, durationMatch } from './mood-score.mjs';
+import { CHANNEL_SCORE as CHANNEL_CAT_SCORE, timeProximity, durationMatch, lateStart } from './mood-score.mjs';
 
 // Tabela de canal și bonusurile de timp/durată sunt cele din scorerul comun.
 
@@ -21,7 +21,7 @@ export function resolvePreferLabel(word) {
   return normalize(Object.hasOwn(PREFERENCE_TO_CATEGORY, k) ? PREFERENCE_TO_CATEGORY[k] : word);
 }
 
-export function scoreShaped(item, { prefer = [], excludeNews = true, now = new Date() } = {}) {
+export function scoreShaped(item, { prefer = [], excludeNews = true, now = new Date(), window = null } = {}) {
   let score = 0;
   const cat = item.channel_category;
 
@@ -52,7 +52,8 @@ export function scoreShaped(item, { prefer = [], excludeNews = true, now = new D
   const programCat = item.program.category;
   if (programCat && programCat !== 'General') score += 0.5;
 
-  score += timeProximity(item.program.start_utc, now).value;
+  score += timeProximity(item.program.start_utc, now, window).value;
+  score += lateStart(item.program.start_utc, now, window);
   score += durationMatch(item.program.duration_min);
 
   return score;
