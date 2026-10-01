@@ -265,3 +265,26 @@ test('an unknown mood is visible in the label, a known one is not altered', () =
   assert.equal(moodLabel(rm('tired'), 'tired'), 'Obosit / Relaxat');
   assert.equal(moodLabel(rm(undefined), undefined), 'Oricine');
 });
+
+// ── Nota IMDb din ghidul TV, măsurată față de mediana categoriei ─────────────
+import { imdbMedians } from '../src/lib/confidence.mjs';
+
+test('an EPG IMDb rating is read against the category median, never below-by-default', () => {
+  const prog = (r) => ({ source: 'tv', _imdbMedian: 6.3, shaped: { program: { category: 'Film', description: 'x'.repeat(60), imdb_rating: r } } });
+  const near = (v, x) => Math.abs(v - x) < 1e-9;
+  assert.ok(near(ratingSignal(prog(6.3)).value, 0.6), 'median film = the unrated described-film prior');
+  assert.ok(near(ratingSignal(prog(7.8)).value, 0.9));
+  assert.ok(near(ratingSignal(prog(4.8)).value, 0.3));
+  assert.match(ratingSignal(prog(7.8)).note, /IMDb 7\.8 din ghidul TV \(mediana categoriei azi: 6\.3\)/);
+  // fără mediană (categorie cu prea puține note) nota nu se folosește
+  const noMedian = { source: 'tv', shaped: { program: { category: 'Film', description: 'x'.repeat(60), imdb_rating: 9 } } };
+  assert.equal(ratingSignal(noMedian).value, 0.6);
+});
+
+test('category medians need at least 30 rated titles', () => {
+  const mk = (n, cat) => Array.from({ length: n }, (_, i) => ({ title: `${cat}${i}`, category: cat, imdbRating: 5 + (i % 5) }));
+  const epg = { channels: [{ programs: [...mk(31, 'Film'), ...mk(10, 'Serial'), { title: 'x', category: 'Film' }] }] };
+  const m = imdbMedians(epg);
+  assert.equal(m.Film, 7);
+  assert.equal('Serial' in m, false);
+});

@@ -216,6 +216,9 @@ export function shapeProgram(channel, program) {
       description: program.description || '',
       // Opționale, doar când sursa EPG le declară.
       ...(program.genres?.length ? { genres: program.genres } : {}),
+      ...(program.originalTitle ? { original_title: program.originalTitle } : {}),
+      ...(program.year ? { year: program.year } : {}),
+      ...(program.imdbRating > 0 ? { imdb_rating: program.imdbRating } : {}),
     },
   };
 }

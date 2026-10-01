@@ -40,6 +40,34 @@ export function tvContentPrior(program) {
 
 export const MIN_VOTES_FOR_RATING = 50;
 
+// Mediana notelor IMDb per categorie EPG, din grila încărcată. Sub 30 de
+// titluri notate într-o categorie nu există mediană (nota nu se folosește).
+const medianMemo = new WeakMap();
+export function imdbMedians(epg) {
+  if (!epg) return {};
+  if (medianMemo.has(epg)) return medianMemo.get(epg);
+  const byCat = new Map();
+  const seen = new Set();
+  for (const ch of (epg.channels || [])) {
+    for (const p of (ch.programs || [])) {
+      if (!(p.imdbRating > 0)) continue;
+      const key = `${p.category}|${p.title}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!byCat.has(p.category)) byCat.set(p.category, []);
+      byCat.get(p.category).push(p.imdbRating);
+    }
+  }
+  const out = {};
+  for (const [cat, list] of byCat) {
+    if (list.length < 30) continue;
+    list.sort((a, b) => a - b);
+    out[cat] = list[Math.floor(list.length / 2)];
+  }
+  medianMemo.set(epg, out);
+  return out;
+}
+
 export function ratingSignal(candidate) {
   // Rating măsurat: catalogul de streaming, sau — pentru TV — același titlu
   // găsit în catalog (xref), când potrivirea e sigură.
@@ -53,6 +81,20 @@ export function ratingSignal(candidate) {
       return { value: 0.5, note: `rating din ${votes} voturi — prea puține ca să conteze (default 0.5)` };
     }
     va = candidate.vote_average;
+  }
+  // TV: nota IMDb pe care sursa EPG o atașează chiar acestui program e cea mai
+  // sigură — nu depinde de potrivirea unui titlu cu catalogul.
+  // Se măsoară FAȚĂ DE mediana categoriei din grila curentă: un program fără
+  // notă primește valoarea implicită a categoriei, deci unul cu nota mediană
+  // trebuie să primească exact atât. Legarea directă pe scara (notă − 5) / 5
+  // pedepsea orice film cu notă măsurată (mediana filmelor TV e 6,3 → 0,26)
+  // față de unul fără notă (0,6): la măsurătoare, 32 din 144 de ferestre
+  // treceau pe transmisii sportive nedescrise.
+  else if (candidate.shaped?.program?.imdb_rating > 0 && Number.isFinite(candidate._imdbMedian)) {
+    const r = candidate.shaped.program.imdb_rating;
+    const base = tvContentPrior(candidate.shaped.program).value;
+    const value = clamp(base + (r - candidate._imdbMedian) / 5, 0, 1);
+    return { value, note: `IMDb ${r.toFixed(1)} din ghidul TV (mediana categoriei azi: ${candidate._imdbMedian.toFixed(1)})` };
   }
   else if (Number.isFinite(candidate._xref?.vote_average) && candidate._xref.vote_average > 0) {
     va = candidate._xref.vote_average;

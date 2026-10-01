@@ -13,8 +13,7 @@ import { detectNoise, NOISE_CATEGORY_KEYS, isNonContent } from '../lib/anti-nois
 import { dedupCandidates } from '../lib/dedup.mjs';
 import {
   ratingSignal, moodFitAxis, timeFitAxis, availabilityAxis, opportunityAxis, capGeometryForUndescribed,
-  importanceAxis, computeComposite, computeConfidence, confidenceBreakdown,
-} from '../lib/confidence.mjs';
+  importanceAxis, computeComposite, computeConfidence, confidenceBreakdown, imdbMedians } from '../lib/confidence.mjs';
 import { assessImportance } from '../lib/importance.mjs';
 import { liveStatus, firstAiringIndex } from '../lib/live-status.mjs';
 import { handleImportantToday } from './important-today.mjs';
@@ -142,6 +141,7 @@ function buildTvCandidates(epg, windowStart, windowEnd, mood) {
   let evaluated = 0;
   const window = { from: windowStart, to: windowEnd };
   const streaming = getStreaming();
+  const medians = imdbMedians(epg);
   for (const ch of (epg?.channels || [])) {
     for (const p of (ch.programs || [])) {
       if (!programOverlaps(p, window)) continue;
@@ -150,7 +150,7 @@ function buildTvCandidates(epg, windowStart, windowEnd, mood) {
       const shaped = shapeProgram(ch, p);
       const genres = extractGenres(p.title, p.description, p);
       const mf = moodFit(shaped, genres, mood);
-      candidates.push({ source: 'tv', shaped, _genres: genres, _moodFit: mf, _xref: exactTitleRating(p.title, streaming, shaped.program.duration_min) });
+      candidates.push({ source: 'tv', shaped, _genres: genres, _moodFit: mf, _xref: exactTitleRating(p.title, streaming, shaped.program.duration_min), _imdbMedian: medians[p.category] });
     }
   }
   return { candidates, evaluated };
