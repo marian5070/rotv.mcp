@@ -13,7 +13,7 @@ export const NowOnTvOutput = {
 
 export const NowOnTvInput = {
   scope: z.enum(['main', 'all']).default('main').describe(
-    'main = 14 main Romanian channels (PRO TV, Antena 1, Kanal D, TVR 1/2, Digi 24, etc.); all = every channel in the guide (the live count is in tv_tonight_card stats.channelsMonitored)'
+    'main = the main Romanian channels (PRO TV, Antena 1, Kanal D, TVR 1/2, Digi 24, etc.); all = every channel in the guide (the live count is in tv_tonight_card stats.channelsMonitored)'
   ),
   exclude_news: z.boolean().default(false).describe(
     'Drop channels whose category is "Știri" (Romanian news channels)'
@@ -61,7 +61,7 @@ export const nowOnTvTool = {
   config: {
     title: 'What is on TV right now',
     description:
-      'Returns the programs currently broadcasting on Romanian TV channels. Use this for "What is on TV now?" type questions. Default scope is the 14 main channels; pass scope="all" for every channel in the guide.',
+      'Returns the programs currently broadcasting on Romanian TV channels. Use this for "What is on TV now?" type questions. Default scope is the main channels; pass scope="all" for every channel in the guide.',
     inputSchema: NowOnTvInput,
     outputSchema: NowOnTvOutput,
   },

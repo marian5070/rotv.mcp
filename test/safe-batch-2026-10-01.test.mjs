@@ -227,3 +227,41 @@ test('a rating built on a handful of votes is not treated as measured', () => {
 test('the tired mood excludes crime as a genre, as it already did by keyword', () => {
   assert.ok(rm('obosit').excl_genres.includes('Crimă'));
 });
+
+// ── Runda a 4-a de teste ChatGPT (1 oct, 18:30) ──────────────────────────────
+import { chronologicalGapMin, hasOverlap } from '../src/tools/plan-evening.mjs';
+import { isSameWork } from '../src/lib/xref.mjs';
+import { moodLabel } from '../src/lib/moods.mjs';
+
+test('plan_evening: gap_min is the chronological gap, never the unfilled budget', () => {
+  const start = new Date('2026-10-01T20:30:00.000Z');
+  const plan = [
+    { start_utc: '2026-10-01T20:30:00.000Z', stop_utc: '2026-10-01T21:54:59.000Z' },
+    { start_utc: '2026-10-01T22:10:00.000Z', stop_utc: '2026-10-01T23:00:00.000Z' },
+  ];
+  assert.equal(chronologicalGapMin(plan, start), 15);
+  assert.equal(chronologicalGapMin([plan[0]], start), 0);
+  assert.equal(chronologicalGapMin([{ start_utc: '2026-10-01T20:40:00.000Z', stop_utc: '2026-10-01T21:40:00.000Z' }], start), 10, 'leading gap counts');
+});
+
+test('plan_evening: overlapping segments are detected', () => {
+  const ok = [{ start_utc: '2026-10-01T20:30:00Z', stop_utc: '2026-10-01T21:54:59Z' }, { start_utc: '2026-10-01T21:55:00Z', stop_utc: '2026-10-01T22:50:00Z' }];
+  const bad = [{ start_utc: '2026-10-01T20:30:00Z', stop_utc: '2026-10-01T21:54:59Z' }, { start_utc: '2026-10-01T21:50:00Z', stop_utc: '2026-10-01T22:50:00Z' }];
+  assert.equal(hasOverlap(ok), false);
+  assert.equal(hasOverlap(bad), true);
+});
+
+test('same title is not the same work when the durations cannot match', () => {
+  const film = { kind: 'movie', runtime: 139 };
+  assert.equal(isSameWork(60, film), false, 'a one-hour documentary is not a 139-minute film');
+  assert.equal(isSameWork(165, film), true, 'a TV airing with ad breaks');
+  assert.equal(isSameWork(60, { kind: 'tv', runtime: 45 }), true, 'series are not checked by duration');
+  assert.equal(isSameWork(60, { kind: 'movie', runtime: null }), true, 'unknown runtime: cannot refute');
+  assert.equal(isSameWork(60, null), false);
+});
+
+test('an unknown mood is visible in the label, a known one is not altered', () => {
+  assert.equal(moodLabel(rm('zzzz'), 'zzzz'), 'Oricine (mood „zzzz" nerecunoscut)');
+  assert.equal(moodLabel(rm('tired'), 'tired'), 'Obosit / Relaxat');
+  assert.equal(moodLabel(rm(undefined), undefined), 'Oricine');
+});

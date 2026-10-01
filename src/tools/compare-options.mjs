@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
-import { shapeProgram } from '../lib/time.mjs';
-import { resolveMood } from '../lib/moods.mjs';
+import { shapeProgram, programDurationMin } from '../lib/time.mjs';
+import { resolveMood, moodLabel } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
-import { findStreamingFor } from '../lib/xref.mjs';
+import { findStreamingFor, isSameWork } from '../lib/xref.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
@@ -86,9 +86,20 @@ export async function handleCompareOptions(args) {
     const query = typeof opt === 'string' ? opt : opt.title;
     const channelFilter = typeof opt === 'object' ? opt.channel : undefined;
 
-    const found = findAiring(epg, query, channelFilter, horizon);
-    const xref = streaming ? findStreamingFor(query, streaming) : null;
+    let found = findAiring(epg, query, channelFilter, horizon);
+    let xref = streaming ? findStreamingFor(query, streaming) : null;
     if (xref) crossUsed = true;
+    // Titlul cerut există EXACT în catalog, iar la TV doar ca fragment din alt
+    // titlu („Începutul" vs „90 de zile până la nuntă: Începutul poveștii"):
+    // utilizatorul a cerut titlul din catalog.
+    if (found && found.match === 'partial' && xref?.tier === 'exact' && !channelFilter) found = null;
+    // Același titlu, altă operă (documentar de o oră vs film de 139 de minute):
+    // difuzarea TV nu primește bonusul de „e și pe streaming".
+    let streamingSameWork = true;
+    if (found && xref && !isSameWork(programDurationMin(found.program), xref)) {
+      streamingSameWork = false;
+    }
+    const scoringXref = streamingSameWork ? xref : null;
 
     if (!found && !xref) {
       results.push({ query, found: false, next_airing: null, streaming: null, score_breakdown: null, total_score: -Infinity });
@@ -103,7 +114,7 @@ export async function handleCompareOptions(args) {
       const item = shapeProgram(found.ch, found.program);
       extractedGenres = extractGenres(found.program.title, found.program.description, found.program);
       if (extractedGenres.length === 0) fallbackUsed = true;
-      const c = scoreComponents(item, { genres: extractedGenres, mood, preferLabels: extraPrefer, now, xref });
+      const c = scoreComponents(item, { genres: extractedGenres, mood, preferLabels: extraPrefer, now, xref: scoringXref });
       total = sumComponents(c, PROFILE.full);
       scoreBreakdown = {
         channel_cat: c.channel_cat,
@@ -145,7 +156,11 @@ export async function handleCompareOptions(args) {
 
     results.push({
       query,
-      found: !!found,
+      // found = găsit în ORICE sursă; tv_found / streaming_found spun unde.
+      found: !!found || !!xref,
+      tv_found: !!found,
+      streaming_found: !!xref,
+      ...(xref && found && !streamingSameWork ? { streaming_same_work: false } : {}),
       next_airing: nextAiring,
       extracted_genres: extractedGenres,
       streaming: xref,
@@ -175,7 +190,7 @@ export async function handleCompareOptions(args) {
     payload: {
       asked_at_utc: now.toISOString(),
       mood: mood.key,
-      mood_label_ro: mood.label_ro,
+      mood_label_ro: moodLabel(mood, args.mood),
       options: cleaned,
       winner,
       freshness: fresh,

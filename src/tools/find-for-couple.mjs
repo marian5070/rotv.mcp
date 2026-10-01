@@ -3,7 +3,7 @@ import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits, lateStartBucket } from '../lib/time.mjs';
 import { resolveMood } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
-import { findStreamingFor } from '../lib/xref.mjs';
+import { findStreamingFor, findStreamingForProgram } from '../lib/xref.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { normalize } from '../lib/text.mjs';
 import { dedupByTitle } from '../lib/rank.mjs';
@@ -76,7 +76,7 @@ function collectAndScore(epg, window, personA, personB, streaming, includeXref, 
       const b = scoreForPerson(item, personB, genres, window, now);
       let xref = null;
       if (includeXref && streaming && Math.min(a.score, b.score) >= 0.5) {
-        xref = findStreamingFor(item.program.title, streaming);
+        xref = findStreamingForProgram(item.program, streaming);
         if (xref) crossUsed = true;
       }
       items.push({ item, a, b, genres, xref, late: lateStartBucket(item.program.start_utc, window, now) });

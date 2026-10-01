@@ -85,7 +85,7 @@ export function findStreamingFor(title, streaming) {
 // candidat TV, iar căutarea liniară prin tot catalogul ducea apelul de la
 // ~0,8 s la peste 3 s.
 const exactIndexCache = new WeakMap();
-export function exactTitleRating(title, streaming) {
+export function exactTitleRating(title, streaming, programDurationMin = null) {
   if (!streaming?.providers || !title) return null;
   let index = exactIndexCache.get(streaming);
   if (!index) {
@@ -98,12 +98,33 @@ export function exactTitleRating(title, streaming) {
           for (const key of [normalize(sItem.title || ''), normalize(sItem.original_title || '')]) {
             if (!key) continue;
             const prev = index.get(key);
-            if (!prev || va > prev.vote_average) index.set(key, { vote_average: va, provider_name: prov.name, title: sItem.title });
+            if (!prev || va > prev.vote_average) {
+              index.set(key, { vote_average: va, provider_name: prov.name, title: sItem.title, kind: kind === 'movies' ? 'movie' : 'tv', runtime: sItem.runtime ?? null });
+            }
           }
         }
       }
     }
     exactIndexCache.set(streaming, index);
   }
-  return index.get(normalize(title)) || null;
+  const hit = index.get(normalize(title)) || null;
+  return hit && isSameWork(programDurationMin, hit) ? hit : null;
+}
+
+// Același titlu nu înseamnă aceeași operă: „Fight Club" pe National Geographic
+// Wild (documentar de o oră despre animale) nu e filmul din 1999 de 139 de
+// minute. Semnalul verificabil pe care îl avem e durata: o difuzare TV a unui
+// FILM din catalog nu poate fi mult mai scurtă decât filmul. Serialele și
+// titlurile fără durată nu se pot verifica așa și trec.
+export function isSameWork(programDurationMin, xref) {
+  if (!xref) return false;
+  if (xref.kind !== 'movie') return true;
+  if (!Number.isFinite(xref.runtime) || !Number.isFinite(programDurationMin) || programDurationMin <= 0) return true;
+  return programDurationMin >= 0.6 * xref.runtime;
+}
+
+// Xref pentru un program TV concret (cu durată), nu pentru un titlu cerut.
+export function findStreamingForProgram(shapedProgram, streaming) {
+  const xref = findStreamingFor(shapedProgram?.title, streaming);
+  return xref && isSameWork(shapedProgram?.duration_min, xref) ? xref : null;
 }

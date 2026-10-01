@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits, lateStartBucket } from '../lib/time.mjs';
-import { resolveMood } from '../lib/moods.mjs';
+import { resolveMood, moodLabel } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
-import { findStreamingFor } from '../lib/xref.mjs';
+import { findStreamingFor, findStreamingForProgram } from '../lib/xref.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { dedupByTitle } from '../lib/rank.mjs';
 import { normalize } from '../lib/text.mjs';
@@ -74,7 +74,7 @@ export async function handleRecommendByMood(args) {
 
       let xref = null;
       if (streaming && score >= 1.5) {
-        xref = findStreamingFor(item.program.title, streaming);
+        xref = findStreamingForProgram(item.program, streaming);
         if (xref) {
           crossUsed = true;
           score += XREF_BONUS;
@@ -115,7 +115,7 @@ export async function handleRecommendByMood(args) {
       generated_at: epg.generatedAt,
       asked_at_utc: now.toISOString(),
       mood: mood.key,
-      mood_label_ro: mood.label_ro,
+      mood_label_ro: moodLabel(mood, args.mood),
       timeframe_label: window.label,
       window: { from_utc: window.from.toISOString(), to_utc: window.to.toISOString() },
       count: top.length,

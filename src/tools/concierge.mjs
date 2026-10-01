@@ -4,7 +4,7 @@ import { exactTitleRating } from '../lib/xref.mjs';
 import {
   shapeProgram, programOverlaps, utcFromLocalParts, localFromUtc, programDurationMin,
 } from '../lib/time.mjs';
-import { resolveMood, moodFit, isKnownMood, moodKeys } from '../lib/moods.mjs';
+import { resolveMood, moodFit, isKnownMood, moodKeys, moodLabel } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { normalize } from '../lib/text.mjs';
@@ -150,7 +150,7 @@ function buildTvCandidates(epg, windowStart, windowEnd, mood) {
       const shaped = shapeProgram(ch, p);
       const genres = extractGenres(p.title, p.description, p);
       const mf = moodFit(shaped, genres, mood);
-      candidates.push({ source: 'tv', shaped, _genres: genres, _moodFit: mf, _xref: exactTitleRating(p.title, streaming) });
+      candidates.push({ source: 'tv', shaped, _genres: genres, _moodFit: mf, _xref: exactTitleRating(p.title, streaming, shaped.program.duration_min) });
     }
   }
   return { candidates, evaluated };
@@ -484,7 +484,7 @@ function outputWindow(window) {
 function outputContext(args, mood, sources) {
   return {
     mood: mood.key,
-    mood_label_ro: mood.label_ro,
+    mood_label_ro: moodLabel(mood, args.mood),
     sources,
     risk_aversion: args.risk_aversion || 'low',
     min_rating: args.min_rating ?? 0,

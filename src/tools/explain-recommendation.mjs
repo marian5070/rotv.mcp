@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits } from '../lib/time.mjs';
-import { resolveMood } from '../lib/moods.mjs';
+import { resolveMood, moodLabel } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
-import { findStreamingFor } from '../lib/xref.mjs';
+import { findStreamingFor, findStreamingForProgram } from '../lib/xref.mjs';
 import { computeFreshness, freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
@@ -75,7 +75,7 @@ function findProgramWhere(epg, title, channel, startUtc, accept) {
       }
     }
   }
-  return best ? { ch: best.ch, program: best.program } : null;
+  return best ? { ch: best.ch, program: best.program, rank: best.key[0] } : null;
 }
 
 export async function handleExplain(args) {
@@ -87,7 +87,13 @@ export async function handleExplain(args) {
   const mood = resolveMood(ctx.mood);
 
   const window = ctx.timeframe ? resolveTimeRef(ctx.timeframe, now) : null;
-  const hit = findProgram(epg, args.title, args.channel, args.start_utc, window, now);
+  let hit = findProgram(epg, args.title, args.channel, args.start_utc, window, now);
+  // La fel ca în tv_compare_options: titlul cerut există exact în catalog, iar
+  // la TV doar ca fragment din alt titlu → se explică titlul din catalog.
+  if (hit && hit.rank === 3 && !args.channel && !args.start_utc && streaming) {
+    const exact = findStreamingFor(args.title, streaming);
+    if (exact?.tier === 'exact') hit = null;
+  }
   if (!hit) {
     // Nu e în grila TV, dar poate fi în catalogul de streaming: îl explicăm cu
     // aceleași componente pe care le folosește tv_compare_options.
@@ -110,7 +116,7 @@ export async function handleExplain(args) {
   const genres = extractGenres(hit.program.title, hit.program.description, hit.program);
   const fallbackUsed = genres.length === 0;
   const extraPrefer = (ctx.prefer || []).map(resolvePreferLabel);
-  const xref = streaming ? findStreamingFor(hit.program.title, streaming) : null;
+  const xref = streaming ? findStreamingForProgram(item.program, streaming) : null;
   const crossUsed = !!xref;
 
   // Aceleași componente și același profil ca tv_compare_options / tv_recommend_by_mood.
@@ -168,7 +174,7 @@ export async function handleExplain(args) {
       },
       context: {
         mood: mood.key,
-        mood_label_ro: mood.label_ro,
+        mood_label_ro: moodLabel(mood, ctx.mood),
         prefer: ctx.prefer || [],
         timeframe: ctx.timeframe || null,
       },
@@ -248,7 +254,7 @@ function explainStreamingOnly(xref, { mood, ctx, now }) {
       },
       context: {
         mood: mood.key,
-        mood_label_ro: mood.label_ro,
+        mood_label_ro: moodLabel(mood, ctx.mood),
         prefer: ctx.prefer || [],
         timeframe: ctx.timeframe || null,
       },

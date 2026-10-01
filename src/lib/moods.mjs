@@ -129,6 +129,13 @@ export function isKnownMood(raw) {
   return norm === FALLBACK_MOOD.key || resolveMood(raw).key !== FALLBACK_MOOD.key;
 }
 
+// Eticheta afișată: când mood-ul cerut nu e recunoscut și s-a căzut pe
+// „oricine", eticheta o spune — fără cheie nouă în răspuns.
+export function moodLabel(mood, raw) {
+  if (raw && !isKnownMood(raw)) return `${mood.label_ro} (mood „${String(raw).slice(0, 40)}" nerecunoscut)`;
+  return mood.label_ro;
+}
+
 export function moodKeys() {
   return Object.keys(MOODS);
 }

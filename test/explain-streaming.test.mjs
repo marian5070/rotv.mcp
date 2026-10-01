@@ -49,3 +49,11 @@ test('a title in neither source is reported as such', async () => {
   assert.equal(payload.ok, false);
   assert.match(payload.reason, /nici în grila TV, nici în catalogul de streaming/);
 });
+
+test('compare: a streaming-only title is found, and says where', async () => {
+  const c = (await handleCompareOptions({ options: ['Proiectul Hail Mary', 'Occident'], upcoming_window_hours: 48 })).payload;
+  const hm = c.options[0];
+  assert.equal(hm.found, true); assert.equal(hm.tv_found, false); assert.equal(hm.streaming_found, true);
+  const oc = c.options[1];
+  assert.equal(oc.found, true); assert.equal(oc.tv_found, true); assert.equal(oc.streaming_found, false);
+});
