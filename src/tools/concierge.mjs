@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getEpgFull } from '../data/store.mjs';
 import {
-  shapeProgram, programOverlaps, utcFromLocalParts, localFromUtc,
+  shapeProgram, programOverlaps, utcFromLocalParts, localFromUtc, programDurationMin,
 } from '../lib/time.mjs';
 import { resolveMood, moodFit } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
@@ -119,6 +119,20 @@ function resolveWindow(args, now) {
   };
 }
 
+// Bloc de grilă muzical (buclă de videoclipuri): program „Muzică", fără
+// descriere, ≥180 min, început la oră fixă, durată multiplu de 60. Un astfel de
+// bloc aliniat pe fereastră lua maximul pe time_fit + availability și bătea
+// orice program real („World Of Mooz" 20:00–24:00, 1 oct 2026). Spectacolele
+// nominale (Mezzo, Stingray) au starturi/durate neregulate și rămân candidați.
+export function isMusicGridFiller(p) {
+  if (p?.category !== 'Muzică') return false;
+  if ((p.description || '').trim()) return false;
+  const d = programDurationMin(p);
+  if (d < 180 || d % 60 !== 0) return false;
+  const s = new Date(p.start);
+  return s.getUTCMinutes() === 0 && s.getUTCSeconds() === 0;
+}
+
 function buildTvCandidates(epg, windowStart, windowEnd, mood) {
   const candidates = [];
   let evaluated = 0;
@@ -127,6 +141,7 @@ function buildTvCandidates(epg, windowStart, windowEnd, mood) {
     for (const p of (ch.programs || [])) {
       if (!programOverlaps(p, window)) continue;
       evaluated++;
+      if (isMusicGridFiller(p)) continue;
       const shaped = shapeProgram(ch, p);
       const genres = extractGenres(p.title, p.description, p);
       const mf = moodFit(shaped, genres, mood);
