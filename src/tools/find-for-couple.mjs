@@ -152,7 +152,11 @@ function filterAndRank(items, fairness, minScore, limit) {
   }).filter((x) => x.combined >= minScore);
 
   const uniqueMap = new Map();
-  for (const s of scored.sort((a, b) => (b.combined - a.combined) || ((a.late ?? 0) - (b.late ?? 0)))) {
+  // La scor egal: întâi programele despre care știm ceva (au genuri detectate),
+  // apoi cele din prima jumătate a ferestrei. Fără genuri rămâne doar scorul
+  // canalului, iar jumătate din grilă e în situația asta.
+  const evidence = (x) => (x.genres?.length ? 1 : 0);
+  for (const s of scored.sort((a, b) => (b.combined - a.combined) || (evidence(b) - evidence(a)) || ((a.late ?? 0) - (b.late ?? 0)))) {
     const key = normalize(s.item.program.title);
     if (!uniqueMap.has(key)) uniqueMap.set(key, s);
   }
