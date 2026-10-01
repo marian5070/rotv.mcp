@@ -16,6 +16,7 @@ import {
   importanceAxis, computeComposite, computeConfidence, confidenceBreakdown,
 } from '../lib/confidence.mjs';
 import { assessImportance } from '../lib/importance.mjs';
+import { liveStatus, firstAiringIndex } from '../lib/live-status.mjs';
 import { handleImportantToday } from './important-today.mjs';
 import { buildTimeline, buildDegradedTimeline } from '../lib/timeline.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
@@ -218,6 +219,22 @@ function computePartialAxes(c, winDurationMin, winStartUtc) {
           { category: c.shaped.channel_category }
         )
       : { score: 0, tier: 0, reasons: [] };
+    // O reluare DOVEDITĂ a unui eveniment major nu are urgența transmisiei:
+    // importanța ei se înjumătățește (și iese din tier-ul inițial).
+    if (c._importance.score > 0) {
+      const live = liveStatus(
+        { title: c.shaped.program.title, description: c.shaped.program.description, start: c.shaped.program.start_utc },
+        firstAiringIndex(getEpgFull()),
+      );
+      if (live.status === 'replay') {
+        const score = Math.round(c._importance.score * 50) / 100;
+        c._importance = {
+          score,
+          tier: score >= 0.8 ? 1 : score >= 0.55 ? 2 : 0,
+          reasons: [`reluare dovedită (${live.evidence}) — importanță înjumătățită`, ...c._importance.reasons],
+        };
+      }
+    }
   }
   return capGeometryForUndescribed(c, {
     rating_signal: ratingSignal(c),
@@ -479,6 +496,8 @@ async function importantTodayHighlights() {
       duration_min: e.program.duration_min,
       tier: e.tier,
       reasons: e.reasons,
+      live_status: e.live_status,
+      ...(e.live_evidence ? { live_evidence: e.live_evidence } : {}),
     }));
   } catch {
     return [];
@@ -634,7 +653,8 @@ export async function handleConcierge(args) {
   const longWindowHint = longWindowPlanHint(primary, window.duration_min);
   if (longWindowHint) reasoning.push(longWindowHint);
   for (const ev of importantToday) {
-    reasoning.push(`Eveniment major azi: ${ev.title} — ${ev.channel}, ${ev.start_local}`);
+    const liveTag = ev.live_status === 'replay' ? ' (reluare)' : ev.live_status === 'live' ? ' (în direct)' : '';
+    reasoning.push(`Eveniment major azi: ${ev.title} — ${ev.channel}, ${ev.start_local}${liveTag}`);
   }
 
   const tvCount = candsAfterDedup.filter((c) => c.source === 'tv').length;
