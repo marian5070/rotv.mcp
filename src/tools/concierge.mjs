@@ -4,7 +4,7 @@ import { exactTitleRating } from '../lib/xref.mjs';
 import {
   shapeProgram, programOverlaps, utcFromLocalParts, localFromUtc, programDurationMin,
 } from '../lib/time.mjs';
-import { resolveMood, moodFit } from '../lib/moods.mjs';
+import { resolveMood, moodFit, isKnownMood, moodKeys } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { normalize } from '../lib/text.mjs';
@@ -319,6 +319,9 @@ function makeAlternative(c, primary, reason) {
   };
 }
 
+// Alternativa „mai lungă" trebuie să fie la cel mult atâtea puncte sub primar.
+export const LONGER_ALT_MAX_GAP_PCT = 15;
+
 function pickDiverseAlternatives(scored, primary, max) {
   if (max <= 0) return [];
   const usedIdx = new Set([scored.indexOf(primary)]);
@@ -346,10 +349,13 @@ function pickDiverseAlternatives(scored, primary, max) {
     usedIdx.add(r1.idx);
   }
 
-  // longer
+  // longer — dar nu orice: „umple mai mult timp" nu justifică un program cu
+  // încredere mult sub alegerea principală (apăreau „Teleshoppingsendung" sau
+  // un meci de tenis la 23%).
+  const primaryPct = primary._confidence?.pct ?? 0;
   const r2 = findFirst((c) => {
     const dur = c.source === 'tv' ? (c.shaped.program.duration_min ?? 0) : (c.runtime ?? 0);
-    return dur > primaryDuration + 30;
+    return dur > primaryDuration + 30 && (c._confidence?.pct ?? 0) >= primaryPct - LONGER_ALT_MAX_GAP_PCT;
   });
   if (r2 && alts.length < max) {
     alts.push(makeAlternative(r2.item, primary, 'mai lungă — umple mai mult timp'));
@@ -650,6 +656,10 @@ export async function handleConcierge(args) {
 
   const breakdown = confidenceBreakdown(primary._axes);
   const reasoning = buildReasoning(primary, primary._axes, exclCats, noiseRes.filtered, lookahead);
+  // Un mood necunoscut cade pe „oricine": o spunem, nu tăcem.
+  if (args.mood && !isKnownMood(args.mood)) {
+    reasoning.push(`Mood „${String(args.mood).slice(0, 40)}" nu e recunoscut — am folosit „oricine". Mood-uri disponibile: ${moodKeys().join(', ')}.`);
+  }
   const longWindowHint = longWindowPlanHint(primary, window.duration_min);
   if (longWindowHint) reasoning.push(longWindowHint);
   for (const ev of importantToday) {

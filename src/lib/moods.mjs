@@ -95,6 +95,13 @@ const ALIASES = {
   'date-night': 'romantic', datenight: 'romantic', cuplu: 'romantic',
   family: 'familie', 'kids-friendly': 'familie',
   thrilling: 'captivant', intens: 'captivant', palpitant: 'captivant', suspans: 'captivant', adrenalina: 'captivant', action: 'captivant',
+  // forme uzuale care cădeau tăcut pe „oricine" (văzute în testele ChatGPT)
+  relaxare: 'obosit', relaxed: 'obosit', relax: 'obosit', linistit: 'obosit', calm: 'obosit', odihna: 'obosit',
+  distractie: 'vesel', amuzant: 'vesel', voios: 'vesel', bine_dispus: 'vesel',
+  atent: 'concentrat', documentar: 'concentrat', informativ: 'concentrat',
+  romantism: 'romantic', dragoste: 'romantic', indragostit: 'romantic',
+  copii: 'familie', familial: 'familie', kids: 'familie',
+  thriller: 'captivant', actiune: 'captivant', tensiune: 'captivant',
 };
 
 export function resolveMood(raw) {
@@ -103,10 +110,25 @@ export function resolveMood(raw) {
   if (MOODS[norm]) return { ...MOODS[norm] };
   const aliasKey = ALIASES[norm];
   if (aliasKey && MOODS[aliasKey]) return { ...MOODS[aliasKey] };
-  for (const [k, mood] of Object.entries(MOODS)) {
-    if (norm.includes(k) || k.includes(norm)) return { ...mood };
+  // Potrivire parțială doar pentru șiruri de minimum 4 litere: altfel „o" sau
+  // „a" se potriveau cu primul mood din listă.
+  if (norm.length >= 4) {
+    for (const [k, mood] of Object.entries(MOODS)) {
+      if (norm.includes(k) || k.includes(norm)) return { ...mood };
+    }
   }
   return { ...FALLBACK_MOOD };
+}
+
+// True dacă șirul duce la un mood real (nu la fallback-ul „oricine").
+export function isKnownMood(raw) {
+  if (!raw) return false;
+  const norm = normalize(raw);
+  return norm === FALLBACK_MOOD.key || resolveMood(raw).key !== FALLBACK_MOOD.key;
+}
+
+export function moodKeys() {
+  return Object.keys(MOODS);
 }
 
 function pickStrings(arr) {

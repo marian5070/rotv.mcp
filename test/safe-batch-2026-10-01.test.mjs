@@ -187,3 +187,27 @@ test('films, sport and documentaries are untouched, and disabled categories stay
   assert.equal(detectNoise(tvCand('Acces direct', 'Talk show'), ['politica', 'reality']).is_noise, false);
   assert.equal(detectNoise({ source: 'streaming', title: 'The Talk Show Murders' }, ['stiri']).is_noise, false);
 });
+
+// ── Mărunte: mood-uri și alternativa „mai lungă" ─────────────────────────────
+import { resolveMood as rm, isKnownMood } from '../src/lib/moods.mjs';
+import { LONGER_ALT_MAX_GAP_PCT } from '../src/tools/concierge.mjs';
+
+test('common mood words resolve instead of silently falling back', () => {
+  assert.equal(rm('relaxare').key, 'obosit');
+  assert.equal(rm('Thriller').key, 'captivant');
+  assert.equal(rm('copii').key, 'familie');
+  assert.equal(rm('tired').key, 'obosit');
+});
+
+test('an unknown mood is reported as unknown; one-letter strings no longer match a mood', () => {
+  assert.equal(isKnownMood('film'), false);
+  assert.equal(rm('o').key, 'oricine');
+  assert.equal(isKnownMood('o'), false);
+  assert.equal(isKnownMood('oricine'), true);
+  assert.equal(isKnownMood('captivant'), true);
+  assert.equal(isKnownMood(undefined), false);
+});
+
+test('the "longer" alternative has a confidence floor', () => {
+  assert.equal(LONGER_ALT_MAX_GAP_PCT, 15);
+});
