@@ -78,3 +78,32 @@ export function findStreamingFor(title, streaming) {
   }
   return best;
 }
+
+// Index titlu normalizat → cel mai bine cotat titlu din catalog, construit o
+// singură dată per încărcare a catalogului. Potrivire EXACTĂ (titlu sau titlu
+// original), O(1) per program: tv_concierge îl folosește pentru fiecare
+// candidat TV, iar căutarea liniară prin tot catalogul ducea apelul de la
+// ~0,8 s la peste 3 s.
+const exactIndexCache = new WeakMap();
+export function exactTitleRating(title, streaming) {
+  if (!streaming?.providers || !title) return null;
+  let index = exactIndexCache.get(streaming);
+  if (!index) {
+    index = new Map();
+    for (const prov of Object.values(streaming.providers)) {
+      for (const kind of ['movies', 'tv']) {
+        for (const sItem of (prov[kind] || [])) {
+          const va = sItem.vote_average;
+          if (!Number.isFinite(va) || va <= 0) continue;
+          for (const key of [normalize(sItem.title || ''), normalize(sItem.original_title || '')]) {
+            if (!key) continue;
+            const prev = index.get(key);
+            if (!prev || va > prev.vote_average) index.set(key, { vote_average: va, provider_name: prov.name, title: sItem.title });
+          }
+        }
+      }
+    }
+    exactIndexCache.set(streaming, index);
+  }
+  return index.get(normalize(title)) || null;
+}

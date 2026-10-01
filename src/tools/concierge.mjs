@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
-import { findStreamingFor } from '../lib/xref.mjs';
+import { exactTitleRating } from '../lib/xref.mjs';
 import {
   shapeProgram, programOverlaps, utcFromLocalParts, localFromUtc, programDurationMin,
 } from '../lib/time.mjs';
@@ -136,21 +136,11 @@ export function isMusicGridFiller(p) {
 
 // Ratingul unui program TV se ia din catalogul de streaming DOAR la potrivire
 // exactă de titlu: o potrivire pe subșir ar atribui ratingul altui film.
-function exactXref(title, streaming, memo) {
-  if (!streaming) return null;
-  if (memo.has(title)) return memo.get(title);
-  const x = findStreamingFor(title, streaming);
-  const v = x && x.tier === 'exact' ? x : null;
-  memo.set(title, v);
-  return v;
-}
-
 function buildTvCandidates(epg, windowStart, windowEnd, mood) {
   const candidates = [];
   let evaluated = 0;
   const window = { from: windowStart, to: windowEnd };
   const streaming = getStreaming();
-  const xrefMemo = new Map();
   for (const ch of (epg?.channels || [])) {
     for (const p of (ch.programs || [])) {
       if (!programOverlaps(p, window)) continue;
@@ -159,7 +149,7 @@ function buildTvCandidates(epg, windowStart, windowEnd, mood) {
       const shaped = shapeProgram(ch, p);
       const genres = extractGenres(p.title, p.description, p);
       const mf = moodFit(shaped, genres, mood);
-      candidates.push({ source: 'tv', shaped, _genres: genres, _moodFit: mf, _xref: exactXref(p.title, streaming, xrefMemo) });
+      candidates.push({ source: 'tv', shaped, _genres: genres, _moodFit: mf, _xref: exactTitleRating(p.title, streaming) });
     }
   }
   return { candidates, evaluated };
