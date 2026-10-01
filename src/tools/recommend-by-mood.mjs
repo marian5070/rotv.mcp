@@ -8,6 +8,7 @@ import { freshnessEmbed } from '../lib/freshness.mjs';
 import { dedupByTitle } from '../lib/rank.mjs';
 import { normalize } from '../lib/text.mjs';
 import { WindowUtc, Freshness, Loose } from '../lib/output-shapes.mjs';
+import { resolvePreferLabel } from '../lib/rank.mjs';
 
 export const RecommendByMoodOutput = {
   generated_at: z.string().nullable().optional(),
@@ -55,7 +56,7 @@ export async function handleRecommendByMood(args) {
 
   const dislikeGenres = (args.dislike_genres || []).map(normalize);
   const dislikeKeywords = (args.dislike_keywords || []).map(normalize);
-  const extraPrefer = (args.prefer || []).map(normalize);
+  const extraPrefer = (args.prefer || []).map(resolvePreferLabel);
 
   const candidates = [];
   let evaluated = 0;

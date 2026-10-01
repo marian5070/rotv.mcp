@@ -6,6 +6,7 @@ import { extractGenres } from '../lib/genre-extract.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
+import { resolvePreferLabel } from '../lib/rank.mjs';
 
 export const PlanEveningOutput = {
   ok: z.boolean(),
@@ -80,7 +81,7 @@ export async function handlePlanEvening(args) {
   const endUtc = new Date(startUtc.getTime() + args.duration_min * 60_000);
   const window = { from: new Date(startUtc.getTime() - 15 * 60_000), to: endUtc, label: 'plan' };
   const mood = resolveMood(args.mood);
-  const extraPrefer = (args.prefer || []).map(normalize);
+  const extraPrefer = (args.prefer || []).map(resolvePreferLabel);
 
   const candidates = [];
   let evaluated = 0;

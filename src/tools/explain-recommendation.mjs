@@ -7,6 +7,7 @@ import { findStreamingFor } from '../lib/xref.mjs';
 import { computeFreshness, freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
+import { resolvePreferLabel } from '../lib/rank.mjs';
 
 export const ExplainOutput = {
   ok: z.boolean(),
@@ -86,7 +87,7 @@ export async function handleExplain(args) {
   const deltaMin = (startMs - now.getTime()) / 60_000;
   const timeProx = (deltaMin >= -5 && deltaMin <= 60) ? 2 : 0;
   const durMatch = (item.program.duration_min >= 45 && item.program.duration_min <= 180) ? 0.5 : 0;
-  const extraPrefer = (ctx.prefer || []).map(normalize);
+  const extraPrefer = (ctx.prefer || []).map(resolvePreferLabel);
   const prefBoost = extraPrefer.includes(normalize(item.channel_category)) ? 1 : 0;
 
   const xref = streaming ? findStreamingFor(hit.program.title, streaming) : null;

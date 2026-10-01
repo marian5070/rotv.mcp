@@ -8,6 +8,7 @@ import { freshnessEmbed } from '../lib/freshness.mjs';
 import { normalize } from '../lib/text.mjs';
 import { dedupByTitle } from '../lib/rank.mjs';
 import { WindowUtc, Freshness, Loose } from '../lib/output-shapes.mjs';
+import { resolvePreferLabel } from '../lib/rank.mjs';
 
 export const FindForCoupleOutput = {
   asked_at_utc: z.string(),
@@ -44,7 +45,7 @@ const CHANNEL_SCORE = { 'Filme & Seriale': 3, 'Documentare': 3, 'Generaliste': 1
 
 function scoreForPerson(item, person, genres) {
   const mood = resolveMood(person.mood);
-  const extraPrefer = (person.prefer || []).map(normalize);
+  const extraPrefer = (person.prefer || []).map(resolvePreferLabel);
   const dislikeGenres = (person.dislike_genres || []).map(normalize);
   const dislikeKeywords = (person.dislike_keywords || []).map(normalize);
 
