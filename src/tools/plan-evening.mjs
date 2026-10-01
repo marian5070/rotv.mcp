@@ -64,6 +64,14 @@ function scoreItem(item, mood, extraPrefer) {
   return { score: base + mf.score, genres, moodParts: mf.parts };
 }
 
+// Scor descrescător; la egalitate câștigă programul cu durata cea mai
+// APROPIATĂ de bugetul rămas. (Până la 1 oct 2026 semnul era inversat și la
+// egalitate câștiga cel mai scurt → planuri de 90 din 240 min.)
+export function compareCandidates(a, b, remaining) {
+  if (b._score !== a._score) return b._score - a._score;
+  return Math.abs(a.program.duration_min - remaining) - Math.abs(b.program.duration_min - remaining);
+}
+
 export async function handlePlanEvening(args) {
   const epg = getEpgFull();
   if (!epg) throw new Error('EPG data not loaded');
@@ -124,10 +132,7 @@ export async function handlePlanEvening(args) {
           if (!args.allow_channel_switch && lastChannel && c.channel_id !== lastChannel) return false;
           return true;
         })
-        .sort((a, b) => {
-          if (b._score !== a._score) return b._score - a._score;
-          return Math.abs(b.program.duration_min - remaining) - Math.abs(a.program.duration_min - remaining);
-        });
+        .sort((a, b) => compareCandidates(a, b, remaining));
       const pick = feasible[0];
       if (!pick) break;
       plan.push(makeSegment(plan.length + 1, pick, mood));
