@@ -1,1 +1,26 @@
-{"generatedAt": "2026-10-01T12:00:00.000Z", "providers": {}}
+{
+  "generatedAt": "2026-10-01T12:00:00.000Z",
+  "providers": {
+    "8": {
+      "name": "Netflix",
+      "movies": [
+        {
+          "id": 1,
+          "title": "Călătoria lui Chihiro",
+          "original_title": "Spirited Away",
+          "year": 2001,
+          "runtime": 110,
+          "voteAverage": 8.5,
+          "voteCount": 17000,
+          "genres": [
+            "Animaţie",
+            "Familie",
+            "Fantasy"
+          ],
+          "overview": "O fetiță ajunge într-o lume a spiritelor și trebuie să-și salveze părinții."
+        }
+      ],
+      "tv": []
+    }
+  }
+}

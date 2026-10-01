@@ -30,3 +30,19 @@ test('highlights carry live_status and the reasoning line marks a replay', async
   const lines = r.reasoning.filter((l) => l.startsWith('Eveniment major azi'));
   assert.ok(lines.length >= 1);
 });
+
+test('mixed sources: the answer carries the best of each source, and exactly one is the primary', async () => {
+  const r = await call({ window: { start: '2026-10-01T17:00:00Z', duration_min: 120 } });
+  const b = r.best_by_source;
+  assert.ok(b, 'best_by_source present when TV and streaming both have candidates');
+  assert.equal(b.tv.kind, 'tv'); assert.equal(b.streaming.kind, 'streaming');
+  assert.equal(Number(b.tv.is_primary) + Number(b.streaming.is_primary), 1);
+  assert.equal(b.gap_pct, Math.abs(b.tv.confidence_pct - b.streaming.confidence_pct));
+  assert.ok(r.reasoning.includes(b.note));
+  assert.equal('reason_not_picked' in b.tv, false);
+});
+
+test('single source: no pair', async () => {
+  const r = await call({ window: { start: '2026-10-01T17:00:00Z', duration_min: 120 }, sources: ['tv'] });
+  assert.equal('best_by_source' in r, false);
+});

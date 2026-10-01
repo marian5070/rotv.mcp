@@ -43,6 +43,7 @@ export const ConciergeOutput = {
     by_category: Loose,
   }).passthrough(),
   alternatives: z.array(Loose),
+  best_by_source: Loose.optional(),
   lookahead: Loose,
   important_today: z.array(Loose).optional(),
   sources_used: z.array(z.string()),
@@ -320,6 +321,25 @@ function makeAlternative(c, primary, reason) {
     summary: `${c.provider_name}, ${c.kind === 'movie' ? 'film' : 'serial'} ${c.year ?? ''}, ${c.runtime ?? '?'} min, rating ${Number.isFinite(c.vote_average) ? c.vote_average.toFixed(1) : '?'}`,
     pros: buildAltPros(c),
     cons: buildAltCons(c, primary),
+  };
+}
+
+function buildBestBySource(sortedCands, primary) {
+  const tv = sortedCands.find((c) => c.source === 'tv');
+  const streaming = sortedCands.find((c) => c.source === 'streaming');
+  if (!tv || !streaming) return null;
+  const entry = (c) => {
+    const { reason_not_picked, pros, cons, ...rest } = makeAlternative(c, primary, null);
+    return { ...rest, is_primary: c === primary };
+  };
+  const t = entry(tv);
+  const s = entry(streaming);
+  const startHm = (t.start_local || '').slice(11, 16);
+  return {
+    tv: t,
+    streaming: s,
+    gap_pct: Math.abs((t.confidence_pct ?? 0) - (s.confidence_pct ?? 0)),
+    note: `Cel mai bun la TV în fereastră: ${t.title} — ${t.channel_name}, ${startHm} (${t.confidence_pct}%). Cel mai bun din catalog, oricând: ${s.title} — ${s.provider_name} (${s.confidence_pct}%).`,
   };
 }
 
@@ -676,6 +696,11 @@ export async function handleConcierge(args) {
   if (moodGateBypassed) {
     reasoning.push(`Atenție: tot ce încape în fereastră are un gen pe care mood-ul „${mood.label_ro}" îl exclude — alegerea de mai sus e singura disponibilă, nu una potrivită. Lărgește fereastra sau sursele.`);
   }
+  // Răspuns pereche: când s-au cerut și TV, și streaming, spunem explicit care e
+  // cel mai bun din fiecare. Catalogul e mereu disponibil, deci în mod mixt
+  // primarul variază puțin cu ora; perechea arată și ce e ACUM la TV.
+  const bestBySource = buildBestBySource(candsAfterDedup, primary);
+  if (bestBySource) reasoning.push(bestBySource.note);
   const longWindowHint = longWindowPlanHint(primary, window.duration_min);
   if (longWindowHint) reasoning.push(longWindowHint);
   for (const ev of importantToday) {
@@ -717,6 +742,7 @@ export async function handleConcierge(args) {
         by_category: noiseRes.counts,
       },
       alternatives,
+      ...(bestBySource ? { best_by_source: bestBySource } : {}),
       lookahead,
       important_today: importantToday,
       sources_used: sourcesUsed,
@@ -746,7 +772,7 @@ export const conciergeTool = {
   config: {
     title: 'Personal Entertainment Concierge — decide for me',
     description:
-      'You have a window of free time — decide for me what to watch right now. Returns ONE primary decision (TV program OR streaming title) with confidence percentage, full reasoning breakdown, and up to 3 diverse alternatives with explicit trade-offs (pros/cons, reason not picked). Picks across live Romanian TV EPG AND streaming catalog (Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime). Built-in anti-noise filter automatically removes news, political talk, reality shows, talk-shows (NO manual filtering needed by the model). Built-in title dedup (handles ~46% duplicate-airing ratio in TV EPG). Built-in opportunity-cost lookahead (flags better options just outside the window). Event-aware: major broadcasts (World Cup / Euro / Champions League / finals) get an importance boost in ranking AND are always listed in the important_today field, even when the mood-based pick is something else — for questions like "what is important today?", prefer tv_important_today. PREFER THIS TOOL over tv_recommend_by_mood and tv_recommend_today whenever the user wants ONE answer / a single decision — those tools return ranked LISTS for browsing, this tool returns a DECISION. It returns exactly ONE pick and leaves the rest of the window as a pause: when the user wants the whole window FILLED with several programmes in sequence ("plan my evening", "ce văd toată seara", "fă-mi un program pentru 20–24", a TV window of 3+ hours), use tv_plan_evening instead. Routes any mood internally (obosit / vesel / concentrat / romantic / familie / captivant + EN aliases tired/happy/focused/romantic/family/thrilling). Trigger phrases: "what should I do", "decide for me", "pick for me", "I have X hours", "ce să fac", "am 2 ore", "alege tu", "mood X durată Y", "o singură decizie", "fii consilierul meu", "what to watch", "concierge me".',
+      'You have a window of free time — decide for me what to watch right now. Returns ONE primary decision (TV program OR streaming title) with confidence percentage, plus best_by_source when both TV and streaming were considered (the best TV airing in the window next to the best catalog title — present both to the user when gap_pct is small, since streaming is available any time and TV only now), full reasoning breakdown, and up to 3 diverse alternatives with explicit trade-offs (pros/cons, reason not picked). Picks across live Romanian TV EPG AND streaming catalog (Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime). Built-in anti-noise filter automatically removes news, political talk, reality shows, talk-shows (NO manual filtering needed by the model). Built-in title dedup (handles ~46% duplicate-airing ratio in TV EPG). Built-in opportunity-cost lookahead (flags better options just outside the window). Event-aware: major broadcasts (World Cup / Euro / Champions League / finals) get an importance boost in ranking AND are always listed in the important_today field, even when the mood-based pick is something else — for questions like "what is important today?", prefer tv_important_today. PREFER THIS TOOL over tv_recommend_by_mood and tv_recommend_today whenever the user wants ONE answer / a single decision — those tools return ranked LISTS for browsing, this tool returns a DECISION. It returns exactly ONE pick and leaves the rest of the window as a pause: when the user wants the whole window FILLED with several programmes in sequence ("plan my evening", "ce văd toată seara", "fă-mi un program pentru 20–24", a TV window of 3+ hours), use tv_plan_evening instead. Routes any mood internally (obosit / vesel / concentrat / romantic / familie / captivant + EN aliases tired/happy/focused/romantic/family/thrilling). Trigger phrases: "what should I do", "decide for me", "pick for me", "I have X hours", "ce să fac", "am 2 ore", "alege tu", "mood X durată Y", "o singură decizie", "fii consilierul meu", "what to watch", "concierge me".',
     inputSchema: ConciergeInput,
     outputSchema: ConciergeOutput,
   },
