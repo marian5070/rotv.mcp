@@ -34,7 +34,7 @@ export const tonightCardTool = {
     description:
       'The daily "what is worth watching tonight?" card: one main decision (importance-scored major event, or a ' +
       'deterministic prime-time film fallback) plus one pick per vertical — TV, streaming (official Netflix RO top 10), ' +
-      'theater (online + stage union), cinema (box office ∩ today\'s real screenings) — and measured stats. ' +
+      'theater (a stage performance happening TODAY, else an online play; a future date only when nothing is on tonight, labelled as the next performance), cinema (box office ∩ today\'s real screenings, else one of today\'s most-screened films) — and measured stats. ' +
       'Same data as the tv.madeinro.eu homepage hero, regenerated daily. ' +
       'In MCP Apps-capable hosts this renders as an interactive card (ui://rotv/tonight-card).',
     inputSchema: {},
