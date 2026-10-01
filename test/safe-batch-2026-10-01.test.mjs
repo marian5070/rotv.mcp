@@ -162,3 +162,28 @@ test('tool descriptions route long windows to plan_evening and single picks to c
   assert.match(c, /use tv_plan_evening instead/);
   assert.match(p, /TV only/); assert.match(p, /use tv_concierge/);
 });
+
+// ── Filtrul de zgomot folosește și eticheta EPG a programului ────────────────
+import { detectNoise } from '../src/lib/anti-noise.mjs';
+
+const tvCand = (title, category, channel_category = 'Generaliste') => ({ source: 'tv', shaped: { channel_category, program: { title, category } } });
+const ALL = ['politica', 'reality', 'talkshow', 'stiri'];
+
+test('a talk show is noise even when its title does not say so', () => {
+  const r = detectNoise(tvCand('Acces direct', 'Talk show'), ALL);
+  assert.equal(r.is_noise, true); assert.equal(r.category, 'talkshow');
+  assert.deepEqual(r.anchors, ['program_category=Talk show']);
+  assert.equal(detectNoise(tvCand('Telemedika', 'Talk show'), ALL).category, 'talkshow');
+});
+
+test('a news bulletin on a generalist channel is noise by its programme label', () => {
+  assert.equal(detectNoise(tvCand('Focus', 'Ştiri'), ALL).category, 'stiri');
+  assert.equal(detectNoise(tvCand('Bloomberg Open Interest', 'Știri', 'Altele'), ALL).category, 'stiri');
+});
+
+test('films, sport and documentaries are untouched, and disabled categories stay off', () => {
+  assert.equal(detectNoise(tvCand('Rețeaua de socializare', 'Film', 'Filme & Seriale'), ALL).is_noise, false);
+  assert.equal(detectNoise(tvCand('Nations League: Spania-Croatia', 'Sport', 'Sport'), ALL).is_noise, false);
+  assert.equal(detectNoise(tvCand('Acces direct', 'Talk show'), ['politica', 'reality']).is_noise, false);
+  assert.equal(detectNoise({ source: 'streaming', title: 'The Talk Show Murders' }, ['stiri']).is_noise, false);
+});

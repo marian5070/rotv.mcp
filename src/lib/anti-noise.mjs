@@ -44,6 +44,9 @@ export const NOISE_CATEGORIES = {
     ],
     title_anchors_en: ['talk show', 'late show'],
     channel_categories: [],
+    // Eticheta EPG a programului: prinde talk-show-urile al căror titlu nu
+    // spune asta („Acces direct", „Telemedika").
+    program_categories: ['talk show'],
   },
   stiri: {
     label: 'Știri / breaking news',
@@ -53,6 +56,9 @@ export const NOISE_CATEGORIES = {
     ],
     title_anchors_en: ['news bulletin', 'evening news'],
     channel_categories: ['Știri'],
+    // Buletinele de pe canale generaliste („Focus", „Telejurnal", „Bloomberg
+    // Open Interest") poartă eticheta de program „Ştiri".
+    program_categories: ['stiri'],
   },
 };
 
@@ -65,10 +71,12 @@ export function detectNoise(candidate, enabledCategories) {
 
   let title = '';
   let channelCategory = null;
+  let programCategory = '';
 
   if (candidate.source === 'tv') {
     title = candidate.shaped?.program?.title || '';
     channelCategory = candidate.shaped?.channel_category || null;
+    programCategory = normalize(candidate.shaped?.program?.category || '');
   } else if (candidate.source === 'streaming') {
     title = `${candidate.title || ''} ${candidate.original_title || ''}`.trim();
   }
@@ -84,6 +92,14 @@ export function detectNoise(candidate, enabledCategories) {
         is_noise: true,
         category: cat,
         anchors: [`channel_category=${channelCategory}`],
+      };
+    }
+
+    if (programCategory && def.program_categories?.includes(programCategory)) {
+      return {
+        is_noise: true,
+        category: cat,
+        anchors: [`program_category=${candidate.shaped.program.category}`],
       };
     }
 
