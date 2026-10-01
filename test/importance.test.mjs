@@ -166,3 +166,21 @@ test('"sferturi de finală" of a minor tournament is not a final', () => {
   assert.equal(assessImportance({ ...q, title: 'Finala Cupei Romaniei' }, { category: 'Sport' }).tier, 1);
   assert.equal(assessImportance({ ...q, title: 'Tenis: Roland Garros - sferturi de finala' }, { category: 'Sport' }).tier, 1);
 });
+
+test('inflected Romanian competition names are recognised', () => {
+  const at = (title) => assessImportance({ title, start: '2026-10-01T18:00:00Z', stop: '2026-10-01T20:00:00Z' }, { category: 'Sport' }).tier;
+  assert.equal(at('Semifinala Ligii Campionilor'), 1);
+  assert.equal(at('Finala Cupei Mondiale'), 1);
+  assert.equal(at('Campionatele Mondiale de atletism'), 1);
+  assert.equal(at('Tir: Campionatele Europene - Malakassa'), 1);
+  assert.equal(at('Faza grupelor Ligii Europa'), 1);
+  assert.equal(at('Ceremonia Jocurilor Olimpice'), 1);
+});
+
+test('inflected names do not weaken the existing guards', () => {
+  const sport = { category: 'Sport' };
+  const p = (title) => ({ title, start: '2026-10-01T18:00:00Z', stop: '2026-10-01T20:00:00Z' });
+  assert.equal(assessImportance(p('Avancronica Jocurilor Olimpice'), sport).tier, 0, 'studio show');
+  assert.equal(assessImportance(p('Legenda Ligii Campionilor'), { category: 'Filme & Seriale' }).tier, 0, 'film channel');
+  assert.equal(assessImportance(p('Liga 2: Campionii de ieri'), sport).tier, 0, 'unrelated title');
+});

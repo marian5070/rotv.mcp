@@ -7,14 +7,16 @@ import { normalize } from './text.mjs';
 import { programDurationMin } from './time.mjs';
 
 // Major competitions (tier 1 when the broadcast is the event itself).
+// Numele apar și flexionate în EPG („Ligii Campionilor", „Cupei Mondiale",
+// „Campionatele Mondiale", „Jocurilor Olimpice") — formele sunt listate explicit.
 // „finala" singură = finală; „sferturi/optimi de finală" NU e o finală (un sfert
 // la un turneu minor primea importanță maximă din acest cuvânt).
 const MAJOR_RE =
-  /\b(world cup|cupa mondiala|campionat(ul)? mondial|fifa|euro 20\d\d|campionat(ul)? european|uefa euro|liga campionilor|champions league|europa league|jocuri(le)? olimpice|olympic|(?<!(?:sferturi(?:le)?|optimi(?:le)?|saisprezecimi(?:le)?) de )finala|grand slam|roland garros|wimbledon|us open|australian open)\b/;
+  /\b(world cup|cup(?:a|ei) mondial[ae]|campionat(?:ul|ului|e|ele|elor)? mondial(?:e|elor)?|fifa|euro 20\d\d|campionat(?:ul|ului|e|ele|elor)? europe(?:an|ne|nelor)|uefa euro|lig(?:a|ii) campionilor|champions league|europa league|lig(?:a|ii) europa|jocuri(?:le|lor)? olimpice|olympic|(?<!(?:sferturi(?:le)?|optimi(?:le)?|saisprezecimi(?:le)?) de )finala|grand slam|roland garros|wimbledon|us open|australian open)\b/;
 
 // Description-only variant: named competitions only — no bare stage words.
 const MAJOR_DESC_RE =
-  /\b(world cup|cupa mondiala|campionat(ul)? mondial|fifa|euro 20\d\d|campionat(ul)? european|uefa euro|liga campionilor|champions league|europa league|jocuri(le)? olimpice|olympic|grand slam|roland garros|wimbledon|us open|australian open)\b/;
+  /\b(world cup|cup(?:a|ei) mondial[ae]|campionat(?:ul|ului|e|ele|elor)? mondial(?:e|elor)?|fifa|euro 20\d\d|campionat(?:ul|ului|e|ele|elor)? europe(?:an|ne|nelor)|uefa euro|lig(?:a|ii) campionilor|champions league|europa league|lig(?:a|ii) europa|jocuri(?:le|lor)? olimpice|olympic|grand slam|roland garros|wimbledon|us open|australian open)\b/;
 
 // Knockout / decisive stages.
 const KNOCKOUT_RE = /\b(optimi(le)?|sferturi(le)?|semifinala?|semifinale(le)?|finala mica|marea finala|baraj)\b/;
