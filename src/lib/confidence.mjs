@@ -68,6 +68,13 @@ export function imdbMedians(epg) {
   return out;
 }
 
+// NU unifica scara TV cu cea de streaming fără o decizie de produs. O notă egală
+// valorează azi cu ~0,34 mai mult la TV (un film TV cu 7,5 → 0,84; unul din
+// catalog cu 7,5 → 0,5), adică ~5 puncte de încredere. Unificarea a fost
+// măsurată la 1 oct 2026 și respinsă: streamingul câștiga 36 din 36 de ferestre
+// mixte, cu ACELAȘI titlu la orice oră (catalogul e mereu disponibil și e
+// selectat pe note mari), deci răspunsul nu mai depindea de ce e la TV.
+// Decalajul funcționează ca primă pentru „e acum, nu oricând".
 export function ratingSignal(candidate) {
   // Rating măsurat: catalogul de streaming, sau — pentru TV — același titlu
   // găsit în catalog (xref), când potrivirea e sigură.
