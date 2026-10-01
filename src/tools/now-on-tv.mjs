@@ -61,7 +61,7 @@ export const nowOnTvTool = {
   config: {
     title: 'What is on TV right now',
     description:
-      'Returns the programs currently broadcasting on Romanian TV channels. Use this for "What is on TV now?" type questions. Default scope is the 14 main channels; pass scope="all" for the full 254-channel list.',
+      'Returns the programs currently broadcasting on Romanian TV channels. Use this for "What is on TV now?" type questions. Default scope is the 14 main channels; pass scope="all" for every channel in the guide.',
     inputSchema: NowOnTvInput,
     outputSchema: NowOnTvOutput,
   },
