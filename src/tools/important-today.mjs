@@ -32,6 +32,28 @@ export const ImportantTodayInput = {
   limit: z.number().int().min(1).max(25).default(10).describe('Max number of events to return'),
 };
 
+// „danemarca - portugalia" / „danemarca – portugalia" / „danemarca vs portugalia"
+// → aceeași cheie, indiferent de ordinea în care apar echipele.
+const TEAM_SYNONYMS = { 'tarile de jos': 'olanda', 'statele unite': 'sua' };
+function eventKey(e) {
+  const pair = (e.reasons || []).map((r) => /^national teams match: "(.+)"$/.exec(r)).find(Boolean);
+  if (pair) {
+    const teams = pair[1].split(/\s*(?:-|–|—|vs\.?|v\.)\s*/).map((t) => TEAM_SYNONYMS[t.trim()] || t.trim()).filter(Boolean).sort();
+    if (teams.length === 2) return `pair:${teams.join('|')}`;
+  }
+  return `title:${normalize(e.program.title)}`;
+}
+
+// Reprezentantul unui eveniment: întâi ce nu e reluare dovedită, apoi scorul,
+// apoi difuzarea cea mai timpurie.
+function betterRepresentative(a, b) {
+  const ra = a.live_status === 'replay' ? 1 : 0;
+  const rb = b.live_status === 'replay' ? 1 : 0;
+  if (ra !== rb) return ra < rb;
+  if (a.score !== b.score) return a.score > b.score;
+  return a.program.start_utc < b.program.start_utc;
+}
+
 export async function handleImportantToday(args) {
   const source = getEpgFull();
   if (!source || !Array.isArray(source.channels)) {
@@ -73,13 +95,36 @@ export async function handleImportantToday(args) {
     }
   }
 
-  // Same event often airs on several channels / repeats — keep the strongest
-  // per normalized title + start hour.
+  // Un EVENIMENT, mai multe difuzări. Același meci apare pe mai multe canale
+  // (cu titluri diferite: „Danemarca – Portugalia" și „etapa 3 UEFA Nations
+  // League: Danemarca-Portugalia Grupe") și se reia în aceeași zi. Grupăm pe
+  // perechea de echipe când detectorul a găsit-o, altfel pe titlu; evenimentul
+  // e reprezentat de cea mai bună difuzare, iar restul stau în `broadcasts`.
   const seen = new Map();
   for (const e of events) {
-    const key = `${normalize(e.program.title)}|${e.program.start_utc.slice(0, 13)}`;
-    const prev = seen.get(key);
-    if (!prev || e.score > prev.score) seen.set(key, e);
+    const key = eventKey(e);
+    const g = seen.get(key);
+    if (!g) seen.set(key, { best: e, all: [e] });
+    else {
+      g.all.push(e);
+      if (betterRepresentative(e, g.best)) g.best = e;
+    }
+  }
+  for (const [key, g] of seen) {
+    g.all.sort((a, b) => a.program.start_utc.localeCompare(b.program.start_utc));
+    seen.set(key, {
+      ...g.best,
+      broadcast_count: g.all.length,
+      broadcasts: g.all.map((b) => ({
+        channel_id: b.channel_id,
+        channel_name: b.channel_name,
+        title: b.program.title,
+        start_local: b.program.start_local,
+        start_utc: b.program.start_utc,
+        duration_min: b.program.duration_min,
+        live_status: b.live_status,
+      })),
+    });
   }
 
   // tier 1 first, then higher score, then air time
@@ -99,7 +144,7 @@ export async function handleImportantToday(args) {
     count: result.length,
     events: result,
     hint: result.length
-      ? 'tier 1 = major event (World Cup / Euro / Champions League / final). reasons quote the EPG text that matched. live_status: "live" or "replay" only when the EPG proves it (live_evidence says how); "unknown" means the EPG does not say — do not present such a broadcast as live.'
+      ? 'tier 1 = major event (World Cup / Euro / Champions League / final). reasons quote the EPG text that matched. each entry is ONE event; broadcasts lists every airing of it today (other channels, repeats). live_status: "live" or "replay" only when the EPG proves it (live_evidence says how); "unknown" means the EPG does not say — do not present such a broadcast as live.'
       : 'Nothing above the importance threshold today. Note: the EPG has sparse metadata (many events carry generic titles), so also check tv_now_on_tv or tv_get_prime_time.',
   };
 }
