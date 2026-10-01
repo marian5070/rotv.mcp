@@ -232,14 +232,14 @@ function buildSegmentWhy(item, mood) {
   return parts.join(' • ');
 }
 
-function dropReason(c, plan, args) {
+export function dropReason(c, plan, args) {
   if (plan.some((s) => s.title === c.program.title)) return 'deja inclus în plan';
   if (c.program.duration_min > args.duration_min) return `prea lung (${c.program.duration_min} min vs buget ${args.duration_min})`;
   const planEnd = plan.length ? new Date(plan[plan.length - 1].stop_utc).getTime() : null;
   if (planEnd) {
     const dt = (new Date(c.program.start_utc).getTime() - planEnd) / 60_000;
     if (dt > args.max_gap_min) return `începe după gap mai mare decât ${args.max_gap_min} min`;
-    if (dt < -5) return 'începe înainte de fereastra disponibilă';
+    if (dt < -5) return 'se suprapune cu un segment deja ales în plan';
   }
   return `scor mai mic (${c._score}) decât selecția`;
 }

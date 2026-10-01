@@ -41,6 +41,13 @@ function channelMatches(ch, raw) {
   return false;
 }
 
+// Căutarea e pe titlu SAU descriere; motivul spune câmpul real al potrivirii.
+export function queryMatchReason(program, query) {
+  return matchesQuery(program.title, query)
+    ? `title contains "${query}"`
+    : `description contains "${query}"`;
+}
+
 export async function handleSearch(args) {
   const epg = getEpgFull();
   if (!epg) throw new Error('EPG data not loaded');
@@ -60,7 +67,7 @@ export async function handleSearch(args) {
 
       const shaped = shapeProgram(ch, p);
       const reasons = [];
-      if (args.query) reasons.push(`title contains "${args.query}"`);
+      if (args.query) reasons.push(queryMatchReason(p, args.query));
       if (args.channel) reasons.push(`channel match: ${ch.displayName}`);
       if (args.category) reasons.push(`category: ${ch.category}`);
       shaped.match_reason = reasons.join(' • ') || 'in timeframe';

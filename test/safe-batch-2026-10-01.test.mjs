@@ -4,7 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isMusicGridFiller } from '../src/tools/concierge.mjs';
-import { compareCandidates } from '../src/tools/plan-evening.mjs';
+import { compareCandidates, dropReason } from '../src/tools/plan-evening.mjs';
+import { queryMatchReason } from '../src/tools/search-program.mjs';
 import { resolvePreferLabel } from '../src/lib/rank.mjs';
 import { isNewsProgram } from '../src/lib/anti-noise.mjs';
 import { normalize } from '../src/lib/text.mjs';
@@ -55,4 +56,16 @@ test('prime_time: programme-level news label is detected with either diacritic f
   assert.equal(isNewsProgram({ title: 'Pasager în trenul terorii', category: 'Film' }), false);
   assert.equal(isNewsProgram({ title: 'Last Week Tonight', category: 'Divertisment' }), false);
   assert.equal(isNewsProgram({ title: 'x' }), false);
+});
+
+test('search: match_reason names the field that actually matched', () => {
+  assert.equal(queryMatchReason({ title: 'Film italian vintage', description: '' }, 'film'), 'title contains "film"');
+  assert.equal(queryMatchReason({ title: 'Samson', description: 'Filmul spune povestea lui Samson.' }, 'film'), 'description contains "film"');
+});
+
+test('plan_evening: a candidate overlapping the chosen segment is not described as "before the window"', () => {
+  const plan = [{ title: 'Inima de mama', stop_utc: '2026-10-01T20:00:00.000Z' }];
+  const args = { duration_min: 180, max_gap_min: 30 };
+  const occident = { _score: 7.5, program: { title: 'Occident', start_utc: '2026-10-01T17:30:00.000Z', duration_min: 105 } };
+  assert.equal(dropReason(occident, plan, args), 'se suprapune cu un segment deja ales în plan');
 });
