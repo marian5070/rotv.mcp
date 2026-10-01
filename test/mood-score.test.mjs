@@ -61,3 +61,25 @@ test('no tool keeps a private copy of the channel table or of the bonus bands', 
   }
   assert.equal(CHANNEL_SCORE['Știri'], -10);
 });
+
+// ── Streaming pe aceeași scară cu TV-ul (tv_compare_options) ────────────────
+import { streamingAsItem } from '../src/lib/mood-score.mjs';
+
+test('a streaming-only title is scored with the same components as a TV programme', () => {
+  const xref = { title: 'Proiectul Hail Mary', runtime: 156, genres: ['SF', 'Aventuri'], vote_average: 8.6 };
+  const s = streamingAsItem(xref, NOW);
+  const c = scoreComponents(s.item, { genres: s.genres, mood: resolveMood('captivant'), now: NOW, xref });
+  assert.equal(c.channel_cat, 3);          // film/serial din catalog
+  assert.equal(c.time_proximity, 2);       // disponibil oricând = începe acum
+  assert.equal(c.duration_match, 0.5);     // 156 min
+  assert.equal(c.xref_boost, 0.5);
+  const tv = { channel_category: 'Filme & Seriale', program: { title: 'x', start_utc: NOW.toISOString(), duration_min: 156 } };
+  const ctv = scoreComponents(tv, { genres: s.genres, mood: resolveMood('captivant'), now: NOW, xref });
+  assert.equal(sumComponents(c, PROFILE.full), sumComponents(ctv, PROFILE.full), 'same inputs, same total, whatever the source');
+});
+
+test('catalogue genres are used as-is and an unknown runtime earns no duration bonus', () => {
+  const s = streamingAsItem({ title: 'Serial', runtime: null, genres: ['Comedie'] }, NOW);
+  assert.deepEqual(s.genres, [{ genre: 'Comedie', confidence: 1, anchors: ['catalog'] }]);
+  assert.equal(scoreComponents(s.item, { genres: s.genres, mood: resolveMood('obosit'), now: NOW }).duration_match, 0);
+});

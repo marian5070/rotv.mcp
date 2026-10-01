@@ -8,7 +8,7 @@ import { freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
-import { scoreComponents, sumComponents, PROFILE } from '../lib/mood-score.mjs';
+import { scoreComponents, sumComponents, PROFILE, streamingAsItem } from '../lib/mood-score.mjs';
 
 export const CompareOptionsOutput = {
   asked_at_utc: z.string(),
@@ -118,8 +118,20 @@ export async function handleCompareOptions(args) {
         description: item.program.description,
       };
     } else {
-      total = xref ? (1 + (xref.vote_average ? xref.vote_average / 10 : 0)) : -Infinity;
-      scoreBreakdown = { channel_cat: 0, mood_fit: 0, time_proximity: 0, duration_match: 0, prefer_boost: 0, xref_boost: xref ? 1 : 0, total: Math.round(total * 100) / 100 };
+      // Doar în streaming: aceleași componente și același profil ca un program TV.
+      const s = streamingAsItem(xref, now);
+      extractedGenres = s.genres;
+      const c = scoreComponents(s.item, { genres: s.genres, mood, preferLabels: extraPrefer, now, xref });
+      total = sumComponents(c, PROFILE.full);
+      scoreBreakdown = {
+        channel_cat: c.channel_cat,
+        mood_fit: c.mood_fit,
+        time_proximity: c.time_proximity,
+        duration_match: c.duration_match,
+        prefer_boost: c.prefer_boost,
+        xref_boost: c.xref_boost,
+        total: Math.round(total * 100) / 100,
+      };
     }
 
     results.push({
@@ -135,7 +147,9 @@ export async function handleCompareOptions(args) {
   }
 
   let winner = null;
-  const ranked = [...results].filter((r) => Number.isFinite(r.total_score)).sort((a, b) => b.total_score - a.total_score);
+  // La scor egal decide ratingul măsurat (unde există), apoi ordinea cerută.
+  const ranked = [...results].filter((r) => Number.isFinite(r.total_score))
+    .sort((a, b) => (b.total_score - a.total_score) || ((b.vote_average ?? 0) - (a.vote_average ?? 0)));
   if (ranked.length) {
     const top = ranked[0];
     winner = {

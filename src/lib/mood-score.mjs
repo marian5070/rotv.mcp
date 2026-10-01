@@ -102,6 +102,27 @@ export function scoreComponents(item, { genres = [], mood, preferLabels = [], no
   };
 }
 
+// Un titlu care există DOAR în catalogul de streaming, pus pe aceeași scară cu
+// un program TV (la fel ca în tv_concierge): categorie „Filme & Seriale",
+// genurile din catalog (același vocabular ca extractorul), durata = runtime,
+// disponibil oricând = „începe acum". Până la 1 oct 2026 tv_compare_options îi
+// dădea 1 + rating/10 (≈1,8), pe o scară pe care un program TV lua 5–8, deci
+// un titlu de streaming nu putea câștiga niciodată o comparație.
+export function streamingAsItem(xref, now = new Date()) {
+  return {
+    item: {
+      channel_category: 'Filme & Seriale',
+      program: {
+        title: xref.title || '',
+        description: '',
+        duration_min: xref.runtime ?? 0, // runtime necunoscut = fără bonus de durată
+        start_utc: now.toISOString(),
+      },
+    },
+    genres: (xref.genres || []).map((g) => ({ genre: g, confidence: 1, anchors: ['catalog'] })),
+  };
+}
+
 // Profilurile: ce componente însumează fiecare unealtă.
 export const PROFILE = Object.freeze({
   full: ['channel_cat', 'mood_fit', 'time_proximity', 'late_start', 'duration_match', 'prefer_boost', 'xref_boost'], // compare, explain, by-mood
