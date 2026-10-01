@@ -14,15 +14,49 @@ export const CONFIDENCE_WEIGHTS = {
   event_importance: 0.15,
 };
 
+// Priorul de conținut pentru TV, când nu există un rating măsurat. Până la
+// 1 oct 2026 orice program TV primea 0,5 constant, deci între programele TV
+// decidea doar geometria ferestrei (durată + oră de start) și câștigau blocuri
+// despre care ghidul nu spune nimic. Valorile NU sunt un rating: spun cât de
+// mult descrie EPG-ul programul (categorie de conținut + sinopsis), iar nota
+// din breakdown o spune explicit.
+const NARRATIVE_CATS = new Set(['film', 'film de scurt metraj', 'concert']);
+const SERIES_CATS = new Set(['serial', 'documentar']);
+const TITLE_CARRIES_CATS = new Set(['film', 'film de scurt metraj', 'concert', 'serial', 'documentar']);
+const foldCat = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[şș]/g, 's').replace(/[ţț]/g, 't').trim();
+
+export function tvContentPrior(program) {
+  const cat = foldCat(program?.category);
+  const described = (program?.description || '').trim().length >= 40;
+  if (described && NARRATIVE_CATS.has(cat)) return { value: 0.6, note: `fără rating; EPG: ${program.category} cu sinopsis` };
+  if (described && SERIES_CATS.has(cat)) return { value: 0.55, note: `fără rating; EPG: ${program.category} cu sinopsis` };
+  // La sport titlul E conținutul („LIVE Tenis", „Nations League: Spania-Croatia"):
+  // lipsa sinopsisului nu spune nimic despre transmisie.
+  if (cat === 'sport') return { value: 0.5, note: 'fără rating; EPG: transmisie sportivă' };
+  if (described) return { value: 0.5, note: 'fără rating; EPG: program cu descriere' };
+  if (TITLE_CARRIES_CATS.has(cat)) return { value: 0.45, note: `fără rating; EPG: ${program.category} fără descriere` };
+  return { value: 0.3, note: 'fără rating; EPG nu descrie programul' };
+}
+
 export function ratingSignal(candidate) {
+  // Rating măsurat: catalogul de streaming, sau — pentru TV — același titlu
+  // găsit în catalog (xref), când potrivirea e sigură.
   let va = null;
+  let via = '';
   if (candidate.source === 'streaming') va = candidate.vote_average;
+  else if (Number.isFinite(candidate._xref?.vote_average) && candidate._xref.vote_average > 0) {
+    va = candidate._xref.vote_average;
+    via = ' (același titlu în catalogul de streaming)';
+  }
   if (va === null || va === undefined || !Number.isFinite(va)) {
+    if (candidate.source === 'tv' && candidate.shaped?.program) {
+      return tvContentPrior(candidate.shaped.program);
+    }
     return { value: 0.5, note: 'fără rating (default 0.5)' };
   }
   const value = clamp((va - 5) / 5, 0, 1);
   const providers = candidate.provider_name ? ` (${candidate.provider_name})` : '';
-  return { value, note: `voteAverage ${va.toFixed(1)}${providers}` };
+  return { value, note: `voteAverage ${va.toFixed(1)}${providers}${via}` };
 }
 
 export function moodFitAxis(moodScore) {
@@ -73,6 +107,22 @@ export function opportunityAxis(candidate, windowMaxComposite) {
     value,
     note: `composite ${(candidate._composite ?? 0).toFixed(2)} vs window max ${windowMaxComposite.toFixed(2)}`,
   };
+}
+
+// Plafon de geometrie: pentru un program TV pe care EPG-ul nu îl descrie
+// (prior de conținut sub 0,5) și care nu e eveniment important, „durata se
+// potrivește cu fereastra" și „începe exact la ora cerută" nu pot valora mai
+// mult de jumătate. Altfel un bloc de 180 de minute despre care nu știm nimic
+// bate un film descris doar pentru că umple mai bine intervalul.
+export const UNDESCRIBED_GEOMETRY_CAP = 0.5;
+export function capGeometryForUndescribed(candidate, axes) {
+  if (candidate.source !== 'tv') return axes;
+  if (!(axes.rating_signal.value < 0.5)) return axes;
+  if ((axes.event_importance?.value ?? 0) > 0) return axes;
+  const cap = (axis) => (axis.value > UNDESCRIBED_GEOMETRY_CAP
+    ? { value: UNDESCRIBED_GEOMETRY_CAP, note: `${axis.note} — plafonat la ${UNDESCRIBED_GEOMETRY_CAP}: EPG nu descrie programul` }
+    : axis);
+  return { ...axes, time_fit: cap(axes.time_fit), availability: cap(axes.availability) };
 }
 
 export function computeComposite(c, axes) {

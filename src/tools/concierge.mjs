@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { getEpgFull } from '../data/store.mjs';
+import { getEpgFull, getStreaming } from '../data/store.mjs';
+import { findStreamingFor } from '../lib/xref.mjs';
 import {
   shapeProgram, programOverlaps, utcFromLocalParts, localFromUtc, programDurationMin,
 } from '../lib/time.mjs';
@@ -8,10 +9,10 @@ import { extractGenres } from '../lib/genre-extract.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { normalize } from '../lib/text.mjs';
 import { buildStreamingPool } from '../lib/streaming-pool.mjs';
-import { detectNoise, NOISE_CATEGORY_KEYS } from '../lib/anti-noise.mjs';
+import { detectNoise, NOISE_CATEGORY_KEYS, isNonContent } from '../lib/anti-noise.mjs';
 import { dedupCandidates } from '../lib/dedup.mjs';
 import {
-  ratingSignal, moodFitAxis, timeFitAxis, availabilityAxis, opportunityAxis,
+  ratingSignal, moodFitAxis, timeFitAxis, availabilityAxis, opportunityAxis, capGeometryForUndescribed,
   importanceAxis, computeComposite, computeConfidence, confidenceBreakdown,
 } from '../lib/confidence.mjs';
 import { assessImportance } from '../lib/importance.mjs';
@@ -133,19 +134,32 @@ export function isMusicGridFiller(p) {
   return s.getUTCMinutes() === 0 && s.getUTCSeconds() === 0;
 }
 
+// Ratingul unui program TV se ia din catalogul de streaming DOAR la potrivire
+// exactă de titlu: o potrivire pe subșir ar atribui ratingul altui film.
+function exactXref(title, streaming, memo) {
+  if (!streaming) return null;
+  if (memo.has(title)) return memo.get(title);
+  const x = findStreamingFor(title, streaming);
+  const v = x && x.tier === 'exact' ? x : null;
+  memo.set(title, v);
+  return v;
+}
+
 function buildTvCandidates(epg, windowStart, windowEnd, mood) {
   const candidates = [];
   let evaluated = 0;
   const window = { from: windowStart, to: windowEnd };
+  const streaming = getStreaming();
+  const xrefMemo = new Map();
   for (const ch of (epg?.channels || [])) {
     for (const p of (ch.programs || [])) {
       if (!programOverlaps(p, window)) continue;
       evaluated++;
-      if (isMusicGridFiller(p)) continue;
+      if (isMusicGridFiller(p) || isNonContent(p)) continue;
       const shaped = shapeProgram(ch, p);
       const genres = extractGenres(p.title, p.description, p);
       const mf = moodFit(shaped, genres, mood);
-      candidates.push({ source: 'tv', shaped, _genres: genres, _moodFit: mf });
+      candidates.push({ source: 'tv', shaped, _genres: genres, _moodFit: mf, _xref: exactXref(p.title, streaming, xrefMemo) });
     }
   }
   return { candidates, evaluated };
@@ -215,13 +229,13 @@ function computePartialAxes(c, winDurationMin, winStartUtc) {
         )
       : { score: 0, tier: 0, reasons: [] };
   }
-  return {
+  return capGeometryForUndescribed(c, {
     rating_signal: ratingSignal(c),
     mood_fit: moodFitAxis(c._moodFit?.score ?? 0),
     time_fit: timeFitAxis(c, winDurationMin),
     availability: availabilityAxis(c, winStartUtc),
     event_importance: importanceAxis(c),
-  };
+  });
 }
 
 function primaryTitleOf(c) {

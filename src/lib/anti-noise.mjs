@@ -6,6 +6,16 @@ export function isNewsProgram(program) {
   return normalize(program?.category || '') === 'stiri';
 }
 
+// Ce NU e conținut de privit: pauze de emisie și teleshopping. Nu e o categorie
+// de zgomot configurabilă (nimeni nu le vrea recomandate), ci o excludere
+// necondiționată la colectarea candidaților. „Închiderea programului" și
+// „Fără Emisie" câștigau ferestre întregi în tv_concierge doar prin durată.
+const NON_CONTENT_TITLE_RE = /^(inchiderea programului|fara emisie|pauza de emisie)\b|teleshop/;
+export function isNonContent(program) {
+  if (normalize(program?.category || '') === 'inchiderea programului') return true;
+  return NON_CONTENT_TITLE_RE.test(normalize(program?.title || ''));
+}
+
 export const NOISE_CATEGORIES = {
   politica: {
     label: 'Politică / dezbateri',

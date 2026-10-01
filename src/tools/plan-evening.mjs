@@ -8,6 +8,8 @@ import { normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
 import { scoreComponents, sumComponents, PROFILE } from '../lib/mood-score.mjs';
+import { isNonContent } from '../lib/anti-noise.mjs';
+import { tvContentPrior } from '../lib/confidence.mjs';
 
 export const PlanEveningOutput = {
   ok: z.boolean(),
@@ -88,6 +90,7 @@ export async function handlePlanEvening(args) {
     for (const p of (ch.programs || [])) {
       if (!programOverlaps(p, window)) continue;
       evaluated++;
+      if (isNonContent(p)) continue;
       const item = shapeProgram(ch, p);
       const { score, genres, moodParts } = scoreItem(item, mood, extraPrefer);
       item._score = Math.round(score * 100) / 100;
@@ -107,6 +110,9 @@ export async function handlePlanEvening(args) {
         && c.program.duration_min <= args.duration_min * 1.2;
     })
     .filter((c) => c._score >= 2)
+    // Un singur program care umple toată seara trebuie să fie unul pe care
+    // ghidul îl descrie; altfel planul se construiește din segmente.
+    .filter((c) => tvContentPrior(c.program).value >= 0.5)
     .sort((a, b) => b._score - a._score)[0];
 
   let plan = [];
