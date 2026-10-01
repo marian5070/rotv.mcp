@@ -142,3 +142,23 @@ test('exact-title rating index: exact matches only, camelCase or snake_case rati
   assert.equal(exactTitleRating('Casino Royale', streaming), null);
   assert.equal(exactTitleRating('Casino', null), null);
 });
+
+// ── Rutare concierge ↔ plan_evening ─────────────────────────────────────────
+import { longWindowPlanHint, conciergeTool } from '../src/tools/concierge.mjs';
+import { planEveningTool } from '../src/tools/plan-evening.mjs';
+
+test('concierge says when one pick leaves a long window mostly empty', () => {
+  const film = { source: 'tv', shaped: { program: { duration_min: 120 } } };
+  assert.match(longWindowPlanHint(film, 240), /120 din 240 min.*tv_plan_evening/);
+  assert.equal(longWindowPlanHint(film, 150), null, 'short window: one pick is the answer');
+  assert.equal(longWindowPlanHint({ source: 'streaming', runtime: 201 }, 240), null, 'the pick already fills the window');
+  assert.match(longWindowPlanHint({ source: 'streaming', runtime: 110 }, 180), /110 din 180/);
+});
+
+test('tool descriptions route long windows to plan_evening and single picks to concierge', () => {
+  const c = conciergeTool.config.description; const p = planEveningTool.config.description;
+  assert.ok(!/over tv_recommend_by_mood, tv_plan_evening/.test(c), 'concierge must not claim precedence over plan_evening');
+  assert.ok(!/a plan for a specific window/.test(c));
+  assert.match(c, /use tv_plan_evening instead/);
+  assert.match(p, /TV only/); assert.match(p, /use tv_concierge/);
+});

@@ -253,7 +253,7 @@ export const planEveningTool = {
   config: {
     title: 'Plan an evening',
     description:
-      'Builds a coherent TV watching plan for an evening — either one long program filling the budget or 2-3 segments with small gaps. Accepts start time, duration budget, mood, and channel preferences. Output: ordered timeline + alternatives dropped + totals.',
+      'Builds a TV watching plan that FILLS a window of time — either one long programme or 2-3 consecutive programmes with small gaps, ordered as a timeline. Use it when the user wants a schedule for the whole evening or a long window (3+ hours) rather than a single pick: "plan my evening", "ce văd toată seara", "fă-mi un program pentru 20–24". TV only (live Romanian EPG, no streaming titles); for ONE decision that may also be a streaming title, use tv_concierge. Accepts start time, duration budget, mood, and channel preferences. Output: ordered timeline + alternatives dropped + totals.',
     inputSchema: PlanEveningInput,
     outputSchema: PlanEveningOutput,
   },

@@ -400,6 +400,17 @@ function computeLookahead(epg, windowEnd, windowDurationMin, mood, currentMaxCom
   };
 }
 
+// tv_concierge întoarce UN singur program. Într-o fereastră lungă, restul
+// rămâne pauză; spunem asta explicit și indicăm unealta care umple fereastra,
+// ca modelul să nu prezinte o singură alegere drept „planul serii".
+export function longWindowPlanHint(primary, windowDurationMin) {
+  if (!(windowDurationMin >= 180)) return null;
+  const used = primary.source === 'tv' ? (primary.shaped?.program?.duration_min ?? 0) : (primary.runtime ?? 0);
+  const left = windowDurationMin - Math.min(used, windowDurationMin);
+  if (left < 60) return null;
+  return `Fereastră lungă: am ales un singur program (${Math.min(used, windowDurationMin)} din ${windowDurationMin} min). Pentru un plan cu mai multe programe TV la rând, folosește tv_plan_evening.`;
+}
+
 function buildReasoning(primary, axes, exclCats, antiNoiseFiltered, lookahead) {
   const r = [];
   if (primary.source === 'streaming') {
@@ -620,6 +631,8 @@ export async function handleConcierge(args) {
 
   const breakdown = confidenceBreakdown(primary._axes);
   const reasoning = buildReasoning(primary, primary._axes, exclCats, noiseRes.filtered, lookahead);
+  const longWindowHint = longWindowPlanHint(primary, window.duration_min);
+  if (longWindowHint) reasoning.push(longWindowHint);
   for (const ev of importantToday) {
     reasoning.push(`Eveniment major azi: ${ev.title} — ${ev.channel}, ${ev.start_local}`);
   }
@@ -687,7 +700,7 @@ export const conciergeTool = {
   config: {
     title: 'Personal Entertainment Concierge — decide for me',
     description:
-      'You have a window of free time — decide for me what to watch right now. Returns ONE primary decision (TV program OR streaming title) with confidence percentage, full reasoning breakdown, and up to 3 diverse alternatives with explicit trade-offs (pros/cons, reason not picked). Picks across live Romanian TV EPG AND streaming catalog (Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime). Built-in anti-noise filter automatically removes news, political talk, reality shows, talk-shows (NO manual filtering needed by the model). Built-in title dedup (handles ~46% duplicate-airing ratio in TV EPG). Built-in opportunity-cost lookahead (flags better options just outside the window). Event-aware: major broadcasts (World Cup / Euro / Champions League / finals) get an importance boost in ranking AND are always listed in the important_today field, even when the mood-based pick is something else — for questions like "what is important today?", prefer tv_important_today. PREFER THIS TOOL over tv_recommend_by_mood, tv_plan_evening, and tv_recommend_today whenever the user wants ONE answer / a single decision / a plan for a specific window — those tools return ranked LISTS for browsing, this tool returns a DECISION. Routes any mood internally (obosit / vesel / concentrat / romantic / familie / captivant + EN aliases tired/happy/focused/romantic/family/thrilling). Trigger phrases: "what should I do", "decide for me", "pick for me", "I have X hours", "ce să fac", "am 2 ore", "alege tu", "mood X durată Y", "o singură decizie", "fii consilierul meu", "what to watch", "concierge me".',
+      'You have a window of free time — decide for me what to watch right now. Returns ONE primary decision (TV program OR streaming title) with confidence percentage, full reasoning breakdown, and up to 3 diverse alternatives with explicit trade-offs (pros/cons, reason not picked). Picks across live Romanian TV EPG AND streaming catalog (Netflix, HBO Max, Disney+, Prime Video, Apple TV+, SkyShowtime). Built-in anti-noise filter automatically removes news, political talk, reality shows, talk-shows (NO manual filtering needed by the model). Built-in title dedup (handles ~46% duplicate-airing ratio in TV EPG). Built-in opportunity-cost lookahead (flags better options just outside the window). Event-aware: major broadcasts (World Cup / Euro / Champions League / finals) get an importance boost in ranking AND are always listed in the important_today field, even when the mood-based pick is something else — for questions like "what is important today?", prefer tv_important_today. PREFER THIS TOOL over tv_recommend_by_mood and tv_recommend_today whenever the user wants ONE answer / a single decision — those tools return ranked LISTS for browsing, this tool returns a DECISION. It returns exactly ONE pick and leaves the rest of the window as a pause: when the user wants the whole window FILLED with several programmes in sequence ("plan my evening", "ce văd toată seara", "fă-mi un program pentru 20–24", a TV window of 3+ hours), use tv_plan_evening instead. Routes any mood internally (obosit / vesel / concentrat / romantic / familie / captivant + EN aliases tired/happy/focused/romantic/family/thrilling). Trigger phrases: "what should I do", "decide for me", "pick for me", "I have X hours", "ce să fac", "am 2 ore", "alege tu", "mood X durată Y", "o singură decizie", "fii consilierul meu", "what to watch", "concierge me".',
     inputSchema: ConciergeInput,
     outputSchema: ConciergeOutput,
   },

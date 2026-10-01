@@ -59,7 +59,7 @@ per-call confirmation. Time references accepted throughout: `now`, `tonight`,
 | Tool | What it does |
 |---|---|
 | `tv_recommend_by_mood` | Ranked list matched to a mood (obosit / vesel / concentrat / romantic / familie / captivant) |
-| `tv_plan_evening` | A full evening plan across TV + streaming |
+| `tv_plan_evening` | A TV plan that fills a long window with consecutive programmes (TV only; one pick incl. streaming = `tv_concierge`) |
 | `tv_compare_options` | Side-by-side trade-offs between candidate picks |
 | `tv_find_for_couple` | Picks that satisfy two different moods at once |
 | `tv_explain_recommendation` | Transparent scoring breakdown for any candidate |
