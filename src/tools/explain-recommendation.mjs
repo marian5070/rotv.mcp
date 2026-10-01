@@ -8,7 +8,7 @@ import { computeFreshness, freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
-import { scoreComponents, sumComponents, PROFILE, channelScore } from '../lib/mood-score.mjs';
+import { scoreComponents, sumComponents, PROFILE, channelScore, streamingAsItem } from '../lib/mood-score.mjs';
 
 export const ExplainOutput = {
   ok: z.boolean(),
@@ -78,10 +78,14 @@ export async function handleExplain(args) {
   const window = ctx.timeframe ? resolveTimeRef(ctx.timeframe, now) : null;
   const hit = findProgram(epg, args.title, args.channel, args.start_utc, window, now);
   if (!hit) {
+    // Nu e în grila TV, dar poate fi în catalogul de streaming: îl explicăm cu
+    // aceleași componente pe care le folosește tv_compare_options.
+    const sx = streaming ? findStreamingFor(args.title, streaming) : null;
+    if (sx) return explainStreamingOnly(sx, { mood, ctx, now });
     return {
       payload: {
         ok: false,
-        reason: `Nu am găsit programul "${args.title}"${args.channel ? ' pe canalul ' + args.channel : ''}.`,
+        reason: `Nu am găsit "${args.title}"${args.channel ? ' pe canalul ' + args.channel : ''} nici în grila TV, nici în catalogul de streaming.`,
         freshness: freshnessEmbed(now),
       },
       _quality: {
@@ -184,6 +188,81 @@ export async function handleExplain(args) {
       unique_channels: 1,
       cross_source_used: crossUsed,
       fallback_used: fallbackUsed,
+      freshness_stale: fresh.overall_stale,
+    },
+  };
+}
+
+function explainStreamingOnly(xref, { mood, ctx, now }) {
+  const extraPrefer = (ctx.prefer || []).map(resolvePreferLabel);
+  const s = streamingAsItem(xref, now);
+  const c = scoreComponents(s.item, { genres: s.genres, mood, preferLabels: extraPrefer, now, xref });
+  const total = Math.round(sumComponents(c, PROFILE.full) * 100) / 100;
+  const fresh = computeFreshness(now);
+  const runtime = xref.runtime ?? null;
+  const rating = Number.isFinite(xref.vote_average) ? xref.vote_average : null;
+
+  const score_breakdown = {
+    channel_cat: { value: c.channel_cat, why: `Titlu din catalogul de streaming (film/serial) — aceeași valoare ca un canal „Filme & Seriale": +${c.channel_cat}` },
+    mood_fit: { value: c.mood_fit, why: c.moodParts.length ? `Mood '${mood.label_ro}': ${c.moodParts.join('; ')}` : `Mood '${mood.label_ro}' — niciun factor nu se aplică` },
+    time_proximity: { value: c.time_proximity, why: `Disponibil oricând pe ${xref.provider_name} — contează ca „începe acum" (+${c.time_proximity})` },
+    duration_match: {
+      value: c.duration_match,
+      why: runtime === null
+        ? 'Durată necunoscută în catalog — fără bonus de durată'
+        : c.duration_match > 0 ? `${runtime} min se încadrează în 45–180` : `${runtime} min — în afara band-ului 45–180`,
+    },
+    prefer_boost: { value: c.prefer_boost, why: c.prefer_boost > 0 ? "Categoria 'Filme & Seriale' e în lista prefer" : 'Nicio preferință explicită aplicată' },
+    xref_boost: { value: c.xref_boost, why: `Bonus ${c.xref_boost} — în catalog pe ${xref.provider_name} (${xref.confidence_label} confidence)` },
+    total,
+  };
+
+  let confidence = 'medium';
+  if (fresh.overall_stale) confidence = 'low';
+  else if (xref.tier === 'exact' && s.genres.length > 0) confidence = 'high';
+
+  return {
+    payload: {
+      ok: true,
+      subject: {
+        source: 'streaming',
+        channel_id: null,
+        channel_name: xref.provider_name,
+        channel_category: 'Filme & Seriale',
+        title: xref.title,
+        start_local: null,
+        start_utc: null,
+        duration_min: runtime,
+        description: rating !== null ? `Doar în streaming · rating TMDB ${rating.toFixed(1)}` : 'Doar în streaming',
+      },
+      context: {
+        mood: mood.key,
+        mood_label_ro: mood.label_ro,
+        prefer: ctx.prefer || [],
+        timeframe: ctx.timeframe || null,
+      },
+      score_breakdown,
+      extracted_genres: s.genres,
+      streaming_xref: xref,
+      sources_used: ['streaming-full', 'moods'],
+      fresh_status: {
+        epg_generated_at: fresh.sources.epg.generated_at,
+        epg_age_min: fresh.sources.epg.age_minutes,
+        streaming_age_min: fresh.sources.streaming.age_minutes,
+        stale: fresh.overall_stale,
+      },
+      alternatives_not_picked: [],
+      confidence,
+      freshness: { epg_age_min: fresh.sources.epg.age_minutes, streaming_age_min: fresh.sources.streaming.age_minutes, stale: fresh.overall_stale },
+    },
+    _quality: {
+      items_returned: 1,
+      candidates_evaluated: 1,
+      avg_score: total,
+      max_score: total,
+      unique_channels: 0,
+      cross_source_used: true,
+      fallback_used: false,
       freshness_stale: fresh.overall_stale,
     },
   };
