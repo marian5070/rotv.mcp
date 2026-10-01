@@ -93,7 +93,7 @@ export function exactTitleRating(title, streaming) {
     for (const prov of Object.values(streaming.providers)) {
       for (const kind of ['movies', 'tv']) {
         for (const sItem of (prov[kind] || [])) {
-          const va = sItem.vote_average;
+          const va = sItem.voteAverage ?? sItem.vote_average;
           if (!Number.isFinite(va) || va <= 0) continue;
           for (const key of [normalize(sItem.title || ''), normalize(sItem.original_title || '')]) {
             if (!key) continue;

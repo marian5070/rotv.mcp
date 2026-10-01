@@ -77,13 +77,33 @@ export function timeFitAxis(candidate, winDurationMin) {
   return { value: clamp(rt / winDurationMin, 0.5, 1.0), note: `runtime ${rt} min vs window ${winDurationMin} min` };
 }
 
-export function availabilityAxis(candidate, winStartUtc) {
+// Disponibilitate pentru TV. Până la 1 oct 2026 scădea la 0 pentru orice start
+// la peste 30 de minute de începutul ferestrei, în ambele direcții, deci într-o
+// seară 20:00–24:00 filmul de la 21:30 nu putea fi niciodată alegerea
+// principală. Cele două direcții nu sunt simetrice:
+//  - început ÎNAINTE de fereastră = minute pierdute din program: scara strictă
+//    de 30 de minute rămâne;
+//  - început DUPĂ = timp de așteptat, pe care cronologia îl arată ca pauză:
+//    toleranța e jumătate din fereastră (cel puțin 30 de minute).
+export const AVAILABILITY_MISSED_TOLERANCE_MIN = 30;
+export function availabilityAxis(candidate, winStartUtc, winDurationMin = 60) {
   if (candidate.source === 'streaming') {
     return { value: 1.0, note: 'streaming oricând' };
   }
   const startMs = new Date(candidate.shaped.program.start_utc).getTime();
-  const dt = Math.abs(startMs - winStartUtc.getTime()) / 60_000;
-  return { value: clamp(1 - dt / 30, 0, 1), note: `TV start ±${Math.round(dt)} min vs window start` };
+  const delta = (startMs - winStartUtc.getTime()) / 60_000;
+  if (delta < 0) {
+    const missed = -delta;
+    return {
+      value: clamp(1 - missed / AVAILABILITY_MISSED_TOLERANCE_MIN, 0, 1),
+      note: `TV început cu ${Math.round(missed)} min înainte de fereastră (toleranță ${AVAILABILITY_MISSED_TOLERANCE_MIN} min)`,
+    };
+  }
+  const tolerance = Math.max(AVAILABILITY_MISSED_TOLERANCE_MIN, winDurationMin / 2);
+  return {
+    value: clamp(1 - delta / tolerance, 0, 1),
+    note: `TV începe la +${Math.round(delta)} min în fereastră (toleranță ${Math.round(tolerance)} min)`,
+  };
 }
 
 // Event-importance axis: fed by assessImportance() (lib/importance.mjs) via

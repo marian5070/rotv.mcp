@@ -223,7 +223,7 @@ function computePartialAxes(c, winDurationMin, winStartUtc) {
     rating_signal: ratingSignal(c),
     mood_fit: moodFitAxis(c._moodFit?.score ?? 0),
     time_fit: timeFitAxis(c, winDurationMin),
-    availability: availabilityAxis(c, winStartUtc),
+    availability: availabilityAxis(c, winStartUtc, winDurationMin),
     event_importance: importanceAxis(c),
   });
 }

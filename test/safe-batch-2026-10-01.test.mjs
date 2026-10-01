@@ -109,3 +109,36 @@ test('geometry is capped only for undescribed, unimportant TV programmes', () =>
   assert.equal(capGeometryForUndescribed(tv, axes(0.3, 0.9)).time_fit.value, 1, 'important event: untouched');
   assert.equal(capGeometryForUndescribed({ source: 'streaming' }, axes(0.3)).time_fit.value, 1);
 });
+
+// ── Axa de disponibilitate (concierge) ───────────────────────────────────────
+import { availabilityAxis } from '../src/lib/confidence.mjs';
+import { exactTitleRating } from '../src/lib/xref.mjs';
+
+const tvAt = (start) => ({ source: 'tv', shaped: { program: { start_utc: start } } });
+const W = new Date('2026-10-01T17:00:00.000Z');                           // 20:00 local
+
+test('availability: a later start inside the window is a wait, scaled to the window', () => {
+  assert.equal(availabilityAxis(tvAt('2026-10-01T17:00:00Z'), W, 240).value, 1);
+  assert.equal(availabilityAxis(tvAt('2026-10-01T17:30:00Z'), W, 240).value, 0.75);   // 20:30
+  assert.equal(availabilityAxis(tvAt('2026-10-01T18:30:00Z'), W, 240).value, 0.25);   // 21:30, filmul PRO TV
+  assert.equal(availabilityAxis(tvAt('2026-10-01T19:00:00Z'), W, 240).value, 0);      // 22:00 = jumătatea ferestrei
+  assert.equal(availabilityAxis(tvAt('2026-10-01T17:30:00Z'), W, 60).value, 0);       // fereastră scurtă: 30 min, ca înainte
+});
+
+test('availability: a programme already running keeps the strict 30-minute scale', () => {
+  assert.equal(availabilityAxis(tvAt('2026-10-01T16:45:00Z'), W, 240).value, 0.5);    // început la 19:45
+  assert.equal(availabilityAxis(tvAt('2026-10-01T16:30:00Z'), W, 240).value, 0);      // 19:30: am pierdut jumătate de oră
+  assert.equal(availabilityAxis(tvAt('2026-10-01T15:15:00Z'), W, 240).value, 0);      // „La bloc" 18:15
+});
+
+test('availability: streaming is always available', () => {
+  assert.equal(availabilityAxis({ source: 'streaming' }, W, 240).value, 1);
+});
+
+test('exact-title rating index: exact matches only, camelCase or snake_case rating', () => {
+  const streaming = { providers: { 8: { name: 'Netflix', movies: [{ title: 'Casino', original_title: 'Casino', voteAverage: 8.0 }], tv: [{ title: 'Dark', vote_average: 8.4 }] } } };
+  assert.equal(exactTitleRating('Casino', streaming).vote_average, 8.0);
+  assert.equal(exactTitleRating('DARK', streaming).vote_average, 8.4);
+  assert.equal(exactTitleRating('Casino Royale', streaming), null);
+  assert.equal(exactTitleRating('Casino', null), null);
+});
