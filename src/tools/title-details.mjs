@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram } from '../lib/time.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
+import { titleMatchRank, matchLabel } from '../lib/title-match.mjs';
 import { ShapedProgram, Loose } from '../lib/output-shapes.mjs';
 
 export const TitleDetailsOutput = {
@@ -39,11 +40,14 @@ export async function handleTitleDetails(args) {
       if (stopMs < now.getTime()) continue;
       const startMs = new Date(p.start).getTime();
       if (startMs > horizon.getTime()) continue;
-      if (!matchesQuery(p.title, args.title)) continue;
-      tvAirings.push(shapeProgram(ch, p));
+      const rank = titleMatchRank(p.title, args.title);
+      if (rank === null) continue;
+      tvAirings.push({ ...shapeProgram(ch, p), match: matchLabel(rank), _rank: rank });
     }
   }
-  tvAirings.sort((a, b) => new Date(a.program.start_utc) - new Date(b.program.start_utc));
+  // Întâi titlul exact, apoi cronologic în cadrul aceleiași calități de potrivire.
+  tvAirings.sort((a, b) => (a._rank - b._rank) || (new Date(a.program.start_utc) - new Date(b.program.start_utc)));
+  for (const a of tvAirings) delete a._rank;
 
   const streamingHits = [];
   if (args.include_streaming) {
@@ -52,8 +56,11 @@ export async function handleTitleDetails(args) {
       for (const [pid, prov] of Object.entries(streaming.providers)) {
         for (const kind of ['movies', 'tv']) {
           for (const item of (prov[kind] || [])) {
-            if (matchesQuery(item.title, args.title) || matchesQuery(item.original_title, args.title)) {
+            const sRank = titleMatchRank(item.title, args.title, item.original_title);
+            if (sRank !== null) {
               streamingHits.push({
+                match: matchLabel(sRank),
+                _rank: sRank,
                 provider_id: Number(pid),
                 provider_name: prov.name,
                 kind: kind === 'movies' ? 'movie' : 'tv',
@@ -75,6 +82,9 @@ export async function handleTitleDetails(args) {
       }
     }
   }
+
+  streamingHits.sort((a, b) => a._rank - b._rank); // stabil: exact înaintea potrivirilor parțiale
+  for (const h of streamingHits) delete h._rank;
 
   return {
     title_query: args.title,

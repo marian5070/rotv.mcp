@@ -8,6 +8,7 @@ import { freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
+import { titleMatchRank, matchLabel, isMostlyMissed } from '../lib/title-match.mjs';
 import { scoreComponents, sumComponents, PROFILE, streamingAsItem } from '../lib/mood-score.mjs';
 
 export const CompareOptionsOutput = {
@@ -46,9 +47,14 @@ function findAiring(epg, query, channel, horizon) {
       if (stopMs < now) continue;
       const startMs = new Date(p.start).getTime();
       if (startMs > horizon) continue;
-      if (!matchesQuery(p.title, query)) continue;
-      if (!best || startMs < new Date(best.program.start).getTime()) {
-        best = { ch, program: p };
+      const rank = titleMatchRank(p.title, query);
+      if (rank === null) continue;
+      // Ordine: cât de exact e titlul → difuzare care se mai poate prinde →
+      // cea mai apropiată în timp. „Amurg" înseamnă filmul „Amurg" de diseară,
+      // nu „Saga Amurg…" care se termină în 12 minute.
+      const key = [rank, isMostlyMissed(p, now) ? 1 : 0, startMs];
+      if (!best || key[0] < best.key[0] || (key[0] === best.key[0] && (key[1] < best.key[1] || (key[1] === best.key[1] && key[2] < best.key[2])))) {
+        best = { ch, program: p, key, match: matchLabel(rank), inProgress: startMs <= now };
       }
     }
   }
@@ -116,6 +122,9 @@ export async function handleCompareOptions(args) {
         start_utc: item.program.start_utc,
         duration_min: item.program.duration_min,
         description: item.program.description,
+        title: item.program.title,                              // titlul programului găsit, nu cel cerut
+        match: found.match,                                     // exact | prefix | partial
+        airing_status: found.inProgress ? 'in_progress' : 'upcoming',
       };
     } else {
       // Doar în streaming: aceleași componente și același profil ca un program TV.

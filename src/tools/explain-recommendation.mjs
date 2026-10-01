@@ -8,6 +8,7 @@ import { computeFreshness, freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
+import { titleMatchRank, isMostlyMissed } from '../lib/title-match.mjs';
 import { scoreComponents, sumComponents, PROFILE, channelScore, streamingAsItem } from '../lib/mood-score.mjs';
 
 export const ExplainOutput = {
@@ -49,6 +50,8 @@ function findProgram(epg, title, channel, startUtc, window = null, now = new Dat
 }
 
 function findProgramWhere(epg, title, channel, startUtc, accept) {
+  const nowMs = Date.now();
+  let best = null;
   for (const ch of epg.channels) {
     if (channel) {
       const q = normalize(channel);
@@ -58,13 +61,21 @@ function findProgramWhere(epg, title, channel, startUtc, accept) {
       if (!hit) continue;
     }
     for (const p of (ch.programs || [])) {
-      if (!matchesQuery(p.title, title)) continue;
+      const rank = titleMatchRank(p.title, title);
+      if (rank === null) continue;
       if (startUtc && new Date(p.start).toISOString() !== new Date(startUtc).toISOString()) continue;
       if (!accept(p)) continue;
-      return { ch, program: p };
+      // Aceeași ordine ca în tv_compare_options: titlu exact → difuzare care se
+      // mai poate prinde (nu una încheiată sau aproape pierdută) → cea mai apropiată.
+      const startMs = new Date(p.start).getTime();
+      const gone = new Date(p.stop).getTime() <= nowMs || isMostlyMissed(p, nowMs) ? 1 : 0;
+      const key = [rank, startUtc ? 0 : gone, startMs];
+      if (!best || key[0] < best.key[0] || (key[0] === best.key[0] && (key[1] < best.key[1] || (key[1] === best.key[1] && key[2] < best.key[2])))) {
+        best = { ch, program: p, key };
+      }
     }
   }
-  return null;
+  return best ? { ch: best.ch, program: best.program } : null;
 }
 
 export async function handleExplain(args) {
