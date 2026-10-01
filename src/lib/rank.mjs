@@ -1,4 +1,5 @@
 import { assessImportance } from './importance.mjs';
+import { normalize } from './text.mjs';
 
 const CHANNEL_CAT_SCORE = {
   'Filme & Seriale': 3,
@@ -20,6 +21,14 @@ const PREFERENCE_TO_CATEGORY = {
   copii: 'Copii',
   muzica: 'Muzică',
 };
+
+// Cuvintele documentate ('filme', 'seriale', …) → eticheta de categorie a
+// canalului; orice altceva trece neschimbat (o etichetă exactă merge în
+// continuare, restul pur și simplu nu se potrivește — fără potrivire fuzzy).
+export function resolvePreferLabel(word) {
+  const k = normalize(word);
+  return normalize(Object.hasOwn(PREFERENCE_TO_CATEGORY, k) ? PREFERENCE_TO_CATEGORY[k] : word);
+}
 
 export function scoreShaped(item, { prefer = [], excludeNews = true, now = new Date() } = {}) {
   let score = 0;

@@ -7,6 +7,7 @@ import { findStreamingFor } from '../lib/xref.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
+import { resolvePreferLabel } from '../lib/rank.mjs';
 
 export const CompareOptionsOutput = {
   asked_at_utc: z.string(),
@@ -69,7 +70,7 @@ export async function handleCompareOptions(args) {
   const now = new Date();
   const horizon = now.getTime() + args.upcoming_window_hours * 3600_000;
   const mood = resolveMood(args.mood);
-  const extraPrefer = (args.prefer || []).map(normalize);
+  const extraPrefer = (args.prefer || []).map(resolvePreferLabel);
 
   const results = [];
   let crossUsed = false;
