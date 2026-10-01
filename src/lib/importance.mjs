@@ -67,7 +67,11 @@ export function assessImportance(program, channel = {}) {
   if (majorInTitle) {
     score = 0.9;
     reasons.push(`major competition in title: "${majorInTitle[0]}"`);
-  } else if (majorInDesc) {
+  } else if (majorInDesc && channel?.category === 'Sport') {
+    // O competiție numită DOAR în descriere e de încredere numai pe un canal de
+    // sport. Pe generaliste/film/altele e o emisiune DESPRE eveniment (magazin,
+    // sinopsis, documentar) — cazul „România face bine" (TVR 2, 1 oct 2026), a
+    // cărei descriere pomenea „Campionatul Mondial FIRST Tech Challenge".
     score = 0.55;
     reasons.push(`major competition mentioned in description: "${majorInDesc[0]}"`);
   }

@@ -60,14 +60,38 @@ test('too-short broadcast with a major keyword is demoted (not a live match)', (
   assert.ok(r.reasons.some((x) => x.includes('too short')));
 });
 
-test('competition only in description is tier 2 (pre-match studio show)', () => {
+// Din 1 oct 2026: o competiție numită DOAR în descriere contează numai pe un
+// canal de sport. Pe generaliste e o emisiune DESPRE eveniment (decizie
+// asumată: studioul pre-meci de pe un generalist nu mai e tier 2).
+const STUDIO = {
+  title: 'Toata lumea la Antena',
+  description: 'Se apropie cel mai spectaculos Campionat Mondial de fotbal din istorie! 104 meciuri...',
+  start: '2026-07-10T18:00:00Z',
+  stop: '2026-07-10T18:50:00Z',
+};
+
+test('competition only in description on a Sport channel is tier 2', () => {
+  assert.equal(assessImportance(STUDIO, { category: 'Sport' }).tier, 2);
+});
+
+test('competition only in description on a generalist channel is NOT important', () => {
+  assert.deepEqual(assessImportance(STUDIO, { category: 'Generaliste' }), { score: 0, tier: 0, reasons: [] });
+  assert.equal(assessImportance(STUDIO).tier, 0);
+});
+
+test('"Romania face bine" (TVR 2, 2026-10-01) is not an event: description merely mentions a world championship', () => {
   const r = assessImportance({
-    title: 'Toata lumea la Antena',
-    description: 'Se apropie cel mai spectaculos Campionat Mondial de fotbal din istorie! 104 meciuri...',
-    start: '2026-07-10T18:00:00Z',
-    stop: '2026-07-10T18:50:00Z',
-  });
-  assert.equal(r.tier, 2);
+    title: 'Romania face bine',
+    description: 'Sezon Nou. Liceenii Heart of RoBots din Buzău au ajuns să reprezinte România la Campionatul Mondial FIRST Tech Challenge de la Houston.',
+    start: '2026-10-01T17:00:00.000Z',
+    stop: '2026-10-01T17:59:59.000Z',
+  }, { category: 'Generaliste' });
+  assert.deepEqual(r, { score: 0, tier: 0, reasons: [] });
+});
+
+test('a national-team fixture on a generalist channel still counts (pair path untouched)', () => {
+  const r = assessImportance({ title: 'Fotbal: Polonia - Romania', description: 'UEFA Liga Natiunilor' }, { category: 'Generaliste' });
+  assert.equal(r.tier, 1);
 });
 
 test('practice session is not the event (WorldSBK antrenament case)', () => {
