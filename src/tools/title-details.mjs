@@ -3,6 +3,7 @@ import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram } from '../lib/time.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { titleMatchRank, matchLabel } from '../lib/title-match.mjs';
+import { isSameWork } from '../lib/xref.mjs';
 import { ShapedProgram, Loose } from '../lib/output-shapes.mjs';
 
 export const TitleDetailsOutput = {
@@ -33,7 +34,7 @@ export async function handleTitleDetails(args) {
   const now = new Date();
   const horizon = new Date(now.getTime() + args.upcoming_window_hours * 3600_000);
 
-  const tvAirings = [];
+  const allTvAirings = [];
   for (const ch of epg.channels) {
     for (const p of (ch.programs || [])) {
       const stopMs = new Date(p.stop).getTime();
@@ -42,12 +43,11 @@ export async function handleTitleDetails(args) {
       if (startMs > horizon.getTime()) continue;
       const rank = titleMatchRank(p.title, args.title);
       if (rank === null) continue;
-      tvAirings.push({ ...shapeProgram(ch, p), match: matchLabel(rank), _rank: rank });
+      allTvAirings.push({ ...shapeProgram(ch, p), match: matchLabel(rank), _rank: rank });
     }
   }
   // Întâi titlul exact, apoi cronologic în cadrul aceleiași calități de potrivire.
-  tvAirings.sort((a, b) => (a._rank - b._rank) || (new Date(a.program.start_utc) - new Date(b.program.start_utc)));
-  for (const a of tvAirings) delete a._rank;
+  allTvAirings.sort((a, b) => (a._rank - b._rank) || (new Date(a.program.start_utc) - new Date(b.program.start_utc)));
 
   const streamingHits = [];
   if (args.include_streaming) {
@@ -84,6 +84,27 @@ export async function handleTitleDetails(args) {
   }
 
   streamingHits.sort((a, b) => a._rank - b._rank); // stabil: exact înaintea potrivirilor parțiale
+
+  // Când titlul cerut există EXACT undeva (la TV sau în catalog), difuzările TV
+  // care doar îl conțin ca fragment sunt alt program: „Începutul" e filmul de pe
+  // HBO Max, nu „90 de zile până la nuntă: Începutul poveștii". Fără nicio
+  // potrivire exactă, fragmentele rămân — sunt tot ce avem. Catalogul de
+  // streaming rămâne ordonat, nefiltrat (continuările sunt utile acolo).
+  const exactSomewhere = allTvAirings.some((a) => a._rank <= 1) || streamingHits.some((h) => h._rank <= 1);
+  const tvAirings = exactSomewhere ? allTvAirings.filter((a) => a._rank < 3) : allTvAirings;
+  const tvPartialOmitted = allTvAirings.length - tvAirings.length;
+  // Același titlu, altă operă: documentarul de o oră „Fight Club" nu e filmul de
+  // 139 de minute din catalog. Marcăm difuzarea, nu o ascundem.
+  const exactStreaming = streamingHits.filter((h) => h._rank <= 1);
+  let differentWork = 0;
+  if (exactStreaming.length) {
+    for (const a of tvAirings) {
+      if (a._rank > 1) continue;
+      const same = exactStreaming.some((h) => isSameWork(a.program.duration_min, { kind: h.kind, runtime: h.runtime_min }));
+      if (!same) { a.streaming_same_work = false; differentWork++; }
+    }
+  }
+  for (const a of allTvAirings) delete a._rank;
   for (const h of streamingHits) delete h._rank;
 
   return {
@@ -94,11 +115,11 @@ export async function handleTitleDetails(args) {
     tv_airings_count: tvAirings.length,
     streaming: streamingHits.slice(0, 20),
     streaming_count: streamingHits.length,
-    summary: summarize(args.title, tvAirings, streamingHits),
+    summary: summarize(args.title, tvAirings, streamingHits, tvPartialOmitted, differentWork),
   };
 }
 
-function summarize(title, tv, streaming) {
+function summarize(title, tv, streaming, tvPartialOmitted = 0, differentWork = 0) {
   const parts = [];
   if (tv.length) {
     const channels = [...new Set(tv.slice(0, 5).map((a) => a.channel_name))];
@@ -106,11 +127,17 @@ function summarize(title, tv, streaming) {
   } else {
     parts.push('no upcoming TV airings');
   }
+  if (tvPartialOmitted) {
+    parts.push(`${tvPartialOmitted} TV airing(s) that only contain the words in a longer title were left out because the exact title exists`);
+  }
   if (streaming.length) {
     const providers = [...new Set(streaming.map((s) => s.provider_name))];
     parts.push(`streaming on ${providers.join(', ')}`);
   } else {
     parts.push('not in streaming catalog');
+  }
+  if (differentWork) {
+    parts.push(`${differentWork} TV airing(s) share the title but are too short to be the film in the catalog (streaming_same_work: false)`);
   }
   return `"${title}": ${parts.join('; ')}.`;
 }
