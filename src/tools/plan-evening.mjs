@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps, utcFromLocalParts } from '../lib/time.mjs';
-import { resolveMood, moodFit } from '../lib/moods.mjs';
+import { resolveMood } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
+import { scoreComponents, sumComponents, PROFILE } from '../lib/mood-score.mjs';
 
 export const PlanEveningOutput = {
   ok: z.boolean(),
@@ -57,12 +58,9 @@ function resolveStart(startRef, now) {
 }
 
 function scoreItem(item, mood, extraPrefer) {
-  const CHANNEL_SCORE = { 'Filme & Seriale': 3, 'Documentare': 3, 'Generaliste': 1, 'Copii': 1, 'Sport': 0.5, 'Muzică': 0.25, 'Altele': 0, 'Știri': -10, 'General': 0 };
-  let base = CHANNEL_SCORE[item.channel_category] ?? 0;
   const genres = extractGenres(item.program.title, item.program.description, item);
-  const mf = moodFit(item, genres, mood);
-  if (extraPrefer?.includes(normalize(item.channel_category))) base += 1;
-  return { score: base + mf.score, genres, moodParts: mf.parts };
+  const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer || [] });
+  return { score: sumComponents(c, PROFILE.plan), genres, moodParts: c.moodParts };
 }
 
 // Scor descrescător; la egalitate câștigă programul cu durata cea mai

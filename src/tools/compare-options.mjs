@@ -1,13 +1,14 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram } from '../lib/time.mjs';
-import { resolveMood, moodFit } from '../lib/moods.mjs';
+import { resolveMood } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { findStreamingFor } from '../lib/xref.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
+import { scoreComponents, sumComponents, PROFILE } from '../lib/mood-score.mjs';
 
 export const CompareOptionsOutput = {
   asked_at_utc: z.string(),
@@ -34,7 +35,6 @@ export const CompareOptionsInput = {
   upcoming_window_hours: z.number().int().min(1).max(72).default(48),
 };
 
-const CHANNEL_SCORE = { 'Filme & Seriale': 3, 'Documentare': 3, 'Generaliste': 1, 'Copii': 1, 'Sport': 0.5, 'Muzică': 0.25, 'Altele': 0, 'Știri': -10, 'General': 0 };
 
 function findAiring(epg, query, channel, horizon) {
   const now = Date.now();
@@ -97,22 +97,15 @@ export async function handleCompareOptions(args) {
       const item = shapeProgram(found.ch, found.program);
       extractedGenres = extractGenres(found.program.title, found.program.description, found.program);
       if (extractedGenres.length === 0) fallbackUsed = true;
-      const channelCat = CHANNEL_SCORE[item.channel_category] ?? 0;
-      const mf = moodFit(item, extractedGenres, mood);
-      const startMs = new Date(item.program.start_utc).getTime();
-      const deltaMin = (startMs - now.getTime()) / 60_000;
-      const timeProx = (deltaMin >= -5 && deltaMin <= 60) ? 2 : 0;
-      const durMatch = (item.program.duration_min >= 45 && item.program.duration_min <= 180) ? 0.5 : 0;
-      const prefBoost = extraPrefer.includes(normalize(item.channel_category)) ? 1 : 0;
-      const xrefBoost = xref ? 0.5 : 0;
-      total = channelCat + mf.score + timeProx + durMatch + prefBoost + xrefBoost;
+      const c = scoreComponents(item, { genres: extractedGenres, mood, preferLabels: extraPrefer, now, xref });
+      total = sumComponents(c, PROFILE.full);
       scoreBreakdown = {
-        channel_cat: channelCat,
-        mood_fit: mf.score,
-        time_proximity: timeProx,
-        duration_match: durMatch,
-        prefer_boost: prefBoost,
-        xref_boost: xrefBoost,
+        channel_cat: c.channel_cat,
+        mood_fit: c.mood_fit,
+        time_proximity: c.time_proximity,
+        duration_match: c.duration_match,
+        prefer_boost: c.prefer_boost,
+        xref_boost: c.xref_boost,
         total: Math.round(total * 100) / 100,
       };
       nextAiring = {

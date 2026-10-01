@@ -1,13 +1,14 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps } from '../lib/time.mjs';
-import { resolveMood, moodFit } from '../lib/moods.mjs';
+import { resolveMood } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { findStreamingFor } from '../lib/xref.mjs';
 import { computeFreshness, freshnessEmbed } from '../lib/freshness.mjs';
 import { matchesQuery, normalize } from '../lib/text.mjs';
 import { Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
+import { scoreComponents, sumComponents, PROFILE, channelScore } from '../lib/mood-score.mjs';
 
 export const ExplainOutput = {
   ok: z.boolean(),
@@ -35,7 +36,6 @@ export const ExplainInput = {
   }).optional(),
 };
 
-const CHANNEL_SCORE = { 'Filme & Seriale': 3, 'Documentare': 3, 'Generaliste': 1, 'Copii': 1, 'Sport': 0.5, 'Muzică': 0.25, 'Altele': 0, 'Știri': -10, 'General': 0 };
 
 function findProgram(epg, title, channel, startUtc) {
   for (const ch of epg.channels) {
@@ -81,20 +81,21 @@ export async function handleExplain(args) {
   const item = shapeProgram(hit.ch, hit.program);
   const genres = extractGenres(hit.program.title, hit.program.description, hit.program);
   const fallbackUsed = genres.length === 0;
-  const mf = moodFit(item, genres, mood);
-  const channelCat = CHANNEL_SCORE[item.channel_category] ?? 0;
-  const startMs = new Date(item.program.start_utc).getTime();
-  const deltaMin = (startMs - now.getTime()) / 60_000;
-  const timeProx = (deltaMin >= -5 && deltaMin <= 60) ? 2 : 0;
-  const durMatch = (item.program.duration_min >= 45 && item.program.duration_min <= 180) ? 0.5 : 0;
   const extraPrefer = (ctx.prefer || []).map(resolvePreferLabel);
-  const prefBoost = extraPrefer.includes(normalize(item.channel_category)) ? 1 : 0;
-
   const xref = streaming ? findStreamingFor(hit.program.title, streaming) : null;
   const crossUsed = !!xref;
-  const xrefBoost = xref ? 0.5 : 0;
 
-  const total = Math.round((channelCat + mf.score + timeProx + durMatch + prefBoost + xrefBoost) * 100) / 100;
+  // Aceleași componente și același profil ca tv_compare_options / tv_recommend_by_mood.
+  const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer, now, xref });
+  const mf = { score: c.mood_fit, parts: c.moodParts };
+  const channelCat = c.channel_cat;
+  const deltaMin = c.deltaMin;
+  const timeProx = c.time_proximity;
+  const durMatch = c.duration_match;
+  const prefBoost = c.prefer_boost;
+  const xrefBoost = c.xref_boost;
+
+  const total = Math.round(sumComponents(c, PROFILE.full) * 100) / 100;
   const fresh = computeFreshness(now);
   const epgAge = fresh.epgAge ?? 0;
 
@@ -175,9 +176,7 @@ function findAlternatives(epg, hit, ctx, now) {
       if (!programOverlaps(p, window)) continue;
       const item = shapeProgram(ch, p);
       const genres = extractGenres(p.title, p.description, p);
-      const base = CHANNEL_SCORE[item.channel_category] ?? 0;
-      const mf = moodFit(item, genres, mood);
-      const score = base + mf.score;
+      const score = sumComponents(scoreComponents(item, { genres, mood, now }), PROFILE.base);
 
       let reason = null;
       if (ch.category === 'Știri' && mood.excl_channel_cats.includes('Știri')) {

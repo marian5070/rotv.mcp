@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits, lateStartBucket } from '../lib/time.mjs';
-import { resolveMood, moodFit } from '../lib/moods.mjs';
+import { resolveMood } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { findStreamingFor } from '../lib/xref.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
@@ -9,6 +9,7 @@ import { dedupByTitle } from '../lib/rank.mjs';
 import { normalize } from '../lib/text.mjs';
 import { WindowUtc, Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
+import { scoreComponents, sumComponents, PROFILE, XREF_BONUS } from '../lib/mood-score.mjs';
 
 export const RecommendByMoodOutput = {
   generated_at: z.string().nullable().optional(),
@@ -32,18 +33,6 @@ export const RecommendByMoodInput = {
   dislike_keywords: z.array(z.string()).optional(),
   limit: z.number().int().min(1).max(10).default(5),
   include_streaming_xref: z.boolean().default(true),
-};
-
-const CHANNEL_BASE_SCORE = {
-  'Filme & Seriale': 3,
-  'Documentare': 3,
-  'Generaliste': 1,
-  'Copii': 1,
-  'Sport': 0.5,
-  'Muzică': 0.25,
-  'Altele': 0,
-  'Știri': -10,
-  'General': 0,
 };
 
 export async function handleRecommendByMood(args) {
@@ -77,24 +66,18 @@ export async function handleRecommendByMood(args) {
 
       if (dislikeGenres.length && genres.some((g) => dislikeGenres.includes(normalize(g.genre)))) continue;
 
-      let score = CHANNEL_BASE_SCORE[ch.category] ?? 0;
-      const mf = moodFit(item, genres, mood);
-      score += mf.score;
-
-      if (extraPrefer.includes(normalize(ch.category))) score += 1;
-
-      const startMs = new Date(item.program.start_utc).getTime();
-      const deltaMin = (startMs - now.getTime()) / 60_000;
-      if (deltaMin >= -5 && deltaMin <= 60) score += 2;
-
-      if (item.program.duration_min >= 45 && item.program.duration_min <= 180) score += 0.5;
+      // Profilul complet, ca în compare/explain; xref se caută doar pentru
+      // candidații care trec deja de 1,5 fără el (cost de căutare).
+      const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer, now });
+      const mf = { score: c.mood_fit, parts: c.moodParts };
+      let score = sumComponents(c, PROFILE.full);
 
       let xref = null;
       if (streaming && score >= 1.5) {
         xref = findStreamingFor(item.program.title, streaming);
         if (xref) {
           crossUsed = true;
-          score += 0.5;
+          score += XREF_BONUS;
         }
       }
 

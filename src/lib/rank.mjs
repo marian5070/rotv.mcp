@@ -1,17 +1,8 @@
 import { assessImportance } from './importance.mjs';
 import { normalize } from './text.mjs';
+import { CHANNEL_SCORE as CHANNEL_CAT_SCORE, timeProximity, durationMatch } from './mood-score.mjs';
 
-const CHANNEL_CAT_SCORE = {
-  'Filme & Seriale': 3,
-  'Documentare': 3,
-  'Generaliste': 1,
-  'Copii': 1,
-  'Sport': 0.5,
-  'Muzică': 0.25,
-  'Altele': 0,
-  'Știri': -10,
-  'General': 0,
-};
+// Tabela de canal și bonusurile de timp/durată sunt cele din scorerul comun.
 
 const PREFERENCE_TO_CATEGORY = {
   filme: 'Filme & Seriale',
@@ -61,11 +52,8 @@ export function scoreShaped(item, { prefer = [], excludeNews = true, now = new D
   const programCat = item.program.category;
   if (programCat && programCat !== 'General') score += 0.5;
 
-  const startMs = new Date(item.program.start_utc).getTime();
-  const deltaMin = (startMs - now.getTime()) / 60_000;
-  if (deltaMin >= -5 && deltaMin <= 60) score += 2;
-
-  if (item.program.duration_min >= 45 && item.program.duration_min <= 180) score += 0.5;
+  score += timeProximity(item.program.start_utc, now).value;
+  score += durationMatch(item.program.duration_min);
 
   return score;
 }

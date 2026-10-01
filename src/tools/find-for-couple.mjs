@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getEpgFull, getStreaming } from '../data/store.mjs';
 import { shapeProgram, resolveTimeRef, programOverlaps, windowAdmits, lateStartBucket } from '../lib/time.mjs';
-import { resolveMood, moodFit } from '../lib/moods.mjs';
+import { resolveMood } from '../lib/moods.mjs';
 import { extractGenres } from '../lib/genre-extract.mjs';
 import { findStreamingFor } from '../lib/xref.mjs';
 import { freshnessEmbed } from '../lib/freshness.mjs';
@@ -9,6 +9,7 @@ import { normalize } from '../lib/text.mjs';
 import { dedupByTitle } from '../lib/rank.mjs';
 import { WindowUtc, Freshness, Loose } from '../lib/output-shapes.mjs';
 import { resolvePreferLabel } from '../lib/rank.mjs';
+import { scoreComponents, sumComponents, PROFILE } from '../lib/mood-score.mjs';
 
 export const FindForCoupleOutput = {
   asked_at_utc: z.string(),
@@ -41,7 +42,6 @@ export const FindForCoupleInput = {
   include_streaming_xref: z.boolean().default(true),
 };
 
-const CHANNEL_SCORE = { 'Filme & Seriale': 3, 'Documentare': 3, 'Generaliste': 1, 'Copii': 1, 'Sport': 0.5, 'Muzică': 0.25, 'Altele': 0, 'Știri': -10, 'General': 0 };
 
 function scoreForPerson(item, person, genres) {
   const mood = resolveMood(person.mood);
@@ -49,10 +49,9 @@ function scoreForPerson(item, person, genres) {
   const dislikeGenres = (person.dislike_genres || []).map(normalize);
   const dislikeKeywords = (person.dislike_keywords || []).map(normalize);
 
-  let score = CHANNEL_SCORE[item.channel_category] ?? 0;
-  const mf = moodFit(item, genres, mood);
-  score += mf.score;
-  if (extraPrefer.includes(normalize(item.channel_category))) score += 1;
+  const c = scoreComponents(item, { genres, mood, preferLabels: extraPrefer });
+  const mf = { score: c.mood_fit, parts: c.moodParts };
+  let score = sumComponents(c, PROFILE.plan);
 
   if (genres.some((g) => dislikeGenres.includes(normalize(g.genre)))) score -= 3;
   const titleLower = normalize(item.program.title);
