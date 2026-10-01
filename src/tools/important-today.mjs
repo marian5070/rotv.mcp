@@ -1,3 +1,4 @@
+import { liveStatus, firstAiringIndex } from '../lib/live-status.mjs';
 import { z } from 'zod';
 import { getEpgFull } from '../data/store.mjs';
 import { utcFromLocalParts, programOverlaps, shapeProgram, TZ } from '../lib/time.mjs';
@@ -53,13 +54,22 @@ export async function handleImportantToday(args) {
     to: utcFromLocalParts({ ...day, hour: 23, minute: 59, second: 59 }),
   };
 
+  const airings = firstAiringIndex(source);
   const events = [];
   for (const ch of source.channels) {
     for (const p of ch.programs || []) {
       if (!programOverlaps(p, window)) continue;
       const imp = assessImportance(p, ch);
       if (imp.tier === 0 || imp.tier > args.min_tier) continue;
-      events.push({ ...shapeProgram(ch, p), tier: imp.tier, score: imp.score, reasons: imp.reasons });
+      const live = liveStatus(p, airings);
+      events.push({
+        ...shapeProgram(ch, p),
+        tier: imp.tier,
+        score: imp.score,
+        reasons: imp.reasons,
+        live_status: live.status,
+        ...(live.evidence ? { live_evidence: live.evidence } : {}),
+      });
     }
   }
 
@@ -76,6 +86,7 @@ export async function handleImportantToday(args) {
   const result = [...seen.values()]
     .sort((a, b) =>
       (a.tier - b.tier) ||
+      ((a.live_status === 'replay') - (b.live_status === 'replay')) || // reluările dovedite, după restul din același tier
       (b.score - a.score) ||
       a.program.start_utc.localeCompare(b.program.start_utc))
     .slice(0, args.limit);
@@ -88,7 +99,7 @@ export async function handleImportantToday(args) {
     count: result.length,
     events: result,
     hint: result.length
-      ? 'tier 1 = major event (World Cup / Euro / Champions League / final). reasons quote the EPG text that matched.'
+      ? 'tier 1 = major event (World Cup / Euro / Champions League / final). reasons quote the EPG text that matched. live_status: "live" or "replay" only when the EPG proves it (live_evidence says how); "unknown" means the EPG does not say — do not present such a broadcast as live.'
       : 'Nothing above the importance threshold today. Note: the EPG has sparse metadata (many events carry generic titles), so also check tv_now_on_tv or tv_get_prime_time.',
   };
 }
@@ -98,7 +109,7 @@ export const importantTodayTool = {
   config: {
     title: "Today's important broadcasts (major events)",
     description:
-      "What actually matters on Romanian TV today: World Cup / Euro / Champions League matches, finals, knockout games, national-team fixtures. Detected from real EPG text (titles + descriptions) with quoted evidence — the EPG has no structured event metadata, so detection is keyword-based and honest about it. Use this FIRST for questions like \"what's important to watch today?\".",
+      "What actually matters on Romanian TV today: World Cup / Euro / Champions League matches, finals, knockout games, national-team fixtures. Detected from real EPG text (titles + descriptions) with quoted evidence — the EPG has no structured event metadata, so detection is keyword-based and honest about it. Each event carries live_status (live / replay / unknown) with the evidence it was derived from; unknown means the EPG does not say whether the broadcast is live. Use this FIRST for questions like \"what's important to watch today?\".",
     inputSchema: ImportantTodayInput,
     outputSchema: ImportantTodayOutput,
   },
