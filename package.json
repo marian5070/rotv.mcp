@@ -10,7 +10,9 @@
   "scripts": {
     "start": "node src/server.mjs",
     "dev": "node --watch src/server.mjs",
-    "smoke": "bash test/smoke.sh"
+    "smoke": "bash test/smoke.sh",
+    "test": "node --test test/*.test.mjs",
+    "golden": "node test/golden/golden.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

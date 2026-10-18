@@ -5,6 +5,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 
+import { freezeClock } from './helpers/freeze-clock.mjs';
+
+freezeClock('2026-10-01T12:00:00Z'); // the fixtures describe 1 Oct 2026
 process.env.ROTV_DATA_DIR = fileURLToPath(new URL('./fixtures/explain-streaming/', import.meta.url));
 const { loadAll } = await import('../src/data/store.mjs');
 const { handleExplain } = await import('../src/tools/explain-recommendation.mjs');
